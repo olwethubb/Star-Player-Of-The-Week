@@ -1,0 +1,1221 @@
+<!-- Blacfox — Star Worker of the Week -->
+<meta charset="UTF-8">
+<!-- Google Fonts: if Landingi lets you place custom code in the page <head>, put this line there for slightly faster loading. Otherwise it's fine to leave it right here. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+<style>
+/* One fixed palette everywhere — warm cocoa ground + ivory text + the brand's
+   own orange, matching the illustrated "bomb sprouting a plant" logo. Not
+   adaptive to system light/dark; this is the app's committed visual identity. */
+:root{
+  --bg:#1e160f;
+  --bg-elevated:#2b2117;
+  --bg-card:#302418;
+  --text:#f5efe3;
+  --text-muted:#c9b79b;
+  --border:rgba(245,239,227,0.14);
+  --border-soft:rgba(245,239,227,0.08);
+  --accent:#f05d2d;
+  --accent-contrast:#241205;
+  --shadow: 0 1px 2px rgba(0,0,0,0.35), 0 8px 30px rgba(0,0,0,0.5);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0; overflow-x:hidden;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Inter',system-ui,sans-serif;
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+
+@keyframes fadein{ from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);} }
+@keyframes revealIn{ 0%{opacity:0; transform:translateY(14px) scale(.96);} 100%{opacity:1; transform:translateY(0) scale(1);} }
+@keyframes glowPulse{ 0%,100%{opacity:.45; transform:scale(.92);} 50%{opacity:.9; transform:scale(1.04);} }
+@keyframes spin{ to{ transform:rotate(360deg); } }
+@keyframes sparkRise{ 0%{transform:translateY(0) scale(.6); opacity:0;} 15%{opacity:1;} 100%{transform:translateY(-72vh) scale(1); opacity:0;} }
+
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration:.001ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;
+  }
+}
+
+.spark-layer{ position:fixed; inset:0; overflow:hidden; z-index:9999; pointer-events:none; }
+.spark{ position:absolute; bottom:-20px; border-radius:50%; filter:blur(1px); animation-name:sparkRise; animation-timing-function:cubic-bezier(.2,.7,.3,1); animation-fill-mode:forwards; }
+
+.wrap{ max-width:820px; margin:0 auto; padding:24px 18px 90px; }
+.topbar{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:28px; flex-wrap:wrap; }
+.topbar-right{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.week-label{ font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.08em; color:var(--text-muted); border:1px solid var(--border); padding:4px 9px; border-radius:100px; }
+
+h1{ font-family:Georgia,'Iowan Old Style','Times New Roman',serif; font-style:italic; font-weight:700; font-size:clamp(24px,6vw,34px); line-height:1.15; margin:0 0 8px; text-wrap:balance; }
+.eyebrow{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--text-muted); margin:0 0 6px; }
+.subhead{ color:var(--text-muted); font-size:14px; line-height:1.55; margin:0 0 28px; max-width:520px; }
+.screen{display:none;}
+.screen.active{display:block; animation:fadein .35s cubic-bezier(.16,1,.3,1);}
+
+.icon{ display:inline-flex; flex-shrink:0; }
+
+/* ---- Logo (same size everywhere) ---- */
+.logo{ height:52px; width:auto; display:block; }
+
+/* ---- Burst accent — the logo's own bomb-sprouting-a-plant illustration,
+   reused wherever the app wants a "moment": the pre-login gate and the
+   winner reveal. Plain CSS conic-gradient, not hand-drawn artwork. */
+.burst{ position:relative; overflow:hidden; }
+.burst::before{
+  content:''; position:absolute; top:-160px; right:-160px; width:460px; height:460px; border-radius:50%;
+  background:repeating-conic-gradient(from 8deg, var(--accent) 0deg 2.2deg, transparent 2.2deg 15deg);
+  opacity:.85;
+  -webkit-mask-image:radial-gradient(circle, black 35%, transparent 72%);
+  mask-image:radial-gradient(circle, black 35%, transparent 72%);
+  pointer-events:none;
+}
+.burst > *{ position:relative; z-index:1; }
+
+/* ---- Gate (pre-login: vote / sign-in / no-access) ---- */
+.gate{
+  background:var(--bg-card); color:var(--text);
+  border-radius:20px;
+  padding:44px clamp(24px,6vw,40px) 40px;
+  margin:6vh 0 0;
+  min-height:min(560px,70vh);
+  display:flex; flex-direction:column;
+  box-shadow:var(--shadow);
+}
+.gate-inner{ position:relative; z-index:1; display:flex; flex-direction:column; flex:1; max-width:420px; }
+.gate-inner .logo{ align-self:flex-start; margin-bottom:clamp(36px,9vh,64px); }
+.gate-eyebrow{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); margin:0 0 10px; }
+.gate h1{ max-width:15ch; }
+.gate-body{ font-size:14.5px; line-height:1.7; color:var(--text-muted); margin:0 0 30px; max-width:34ch; }
+.gate-actions{ margin-top:auto; display:flex; flex-direction:column; gap:12px; }
+.gate-btn{ width:100%; border-radius:0; font-weight:700; font-size:15px; padding:16px 20px; border:none; cursor:pointer; text-align:left; transition:transform .12s ease, filter .12s ease; font-family:'Inter',system-ui,sans-serif; }
+.gate-btn:active{ transform:scale(.98); }
+.gate-btn.primary{ background:var(--accent); color:var(--accent-contrast); clip-path:polygon(0 0,96% 0,100% 30%,100% 100%,4% 100%,0 70%); }
+.gate-btn.primary:hover{ filter:brightness(1.08); }
+.gate-btn.ghost{ background:transparent; color:var(--text); border:1px solid var(--border); }
+.gate-btn.ghost:hover{ border-color:var(--accent); color:var(--accent); }
+.field{ margin-bottom:14px; text-align:left; }
+.field label{ display:block; font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:6px; }
+.field input{
+  width:100%; font-size:16px; padding:13px 14px; border-radius:12px;
+  border:1px solid var(--border); background:var(--bg-elevated); color:var(--text);
+  transition:border-color .15s ease;
+}
+.field input:focus{ outline:none; border-color:var(--accent); }
+.pw-wrap{ position:relative; }
+.pw-wrap input{ padding-right:46px; }
+.pw-toggle{
+  position:absolute; right:4px; top:0; bottom:0; width:42px;
+  background:none; border:none; cursor:pointer; color:var(--text-muted);
+  display:flex; align-items:center; justify-content:center;
+}
+.login-error{ color:var(--accent); font-size:13px; margin:-2px 0 14px; min-height:1px; text-align:left; }
+.full-btn{ width:100%; padding:15px; font-size:15px; min-height:48px; }
+.forgot-link{ display:block; text-align:left; margin-top:14px; font-size:13px; color:var(--text-muted); background:none; border:none; cursor:pointer; text-decoration:underline; padding:0; }
+
+/* ---- Header identity row ---- */
+.who-row{ display:flex; align-items:center; gap:10px; margin-bottom:22px; flex-wrap:wrap; }
+.who-row .whoname{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:14px; }
+.logout-link{ margin-left:auto; font-size:13px; color:var(--text-muted); background:none; border:none; cursor:pointer; padding:8px 4px; text-decoration:underline; }
+.badge{ font-size:10px; font-weight:700; padding:3px 9px; border-radius:100px; font-family:'JetBrains Mono',monospace; letter-spacing:.03em; }
+.badge.owner{ background:var(--accent); color:var(--accent-contrast); }
+.badge.admin{ border:1px solid var(--accent); color:var(--accent); }
+.wallet-chip{ display:flex; align-items:center; gap:6px; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:13px; background:var(--bg-elevated); border:1px solid var(--border); padding:6px 12px; border-radius:100px; color:var(--text); }
+.badge.finance{ border:1px solid var(--text-muted); color:var(--text-muted); }
+
+.balance-card{ background:var(--bg-card); border:1px solid var(--border); border-radius:16px; padding:16px; margin-bottom:20px; box-shadow:var(--shadow); }
+.balance-card-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.balance-label{ font-size:13px; color:var(--text-muted); }
+.balance-amount{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:18px; }
+.balance-status{ font-size:13px; color:var(--text-muted); margin-bottom:10px; }
+
+/* ---- Voting ---- */
+.vote-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; margin-bottom:24px; }
+.vote-card{ background:var(--bg-card); border:1px solid var(--border); border-radius:16px; padding:16px; display:flex; align-items:center; gap:12px; box-shadow:var(--shadow); transition:transform .18s cubic-bezier(.2,.8,.2,1), border-color .18s ease, box-shadow .18s ease; }
+.vote-card:hover{ transform:translateY(-3px); border-color:var(--accent); }
+.vote-card.selected{ border-color:var(--accent); border-width:2px; padding:15px; }
+.avatar{ width:40px;height:40px;border-radius:10px; background:var(--accent); color:var(--accent-contrast); display:flex;align-items:center;justify-content:center; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px; flex-shrink:0; }
+.vote-card .name{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px; flex:1; min-width:0; overflow-wrap:anywhere; }
+.vote-btn{
+  border:1px solid var(--border); background:transparent; color:var(--text);
+  font-family:'Inter',sans-serif; font-weight:600; font-size:13px; padding:11px 16px;
+  min-height:44px; border-radius:100px; cursor:pointer; white-space:nowrap;
+  display:inline-flex; align-items:center; gap:6px;
+  transition:transform .12s ease, background .15s ease, border-color .15s ease;
+}
+.vote-btn:active{ transform:scale(.96); }
+.vote-btn.voted{ background:var(--accent); border-color:var(--accent); color:var(--accent-contrast); }
+.lock-note{ display:flex; align-items:flex-start; gap:9px; font-size:13px; color:var(--text-muted); background:var(--bg-elevated); border:1px solid var(--border-soft); padding:12px 16px; border-radius:12px; margin-bottom:24px; line-height:1.5; }
+.lock-note .icon{ margin-top:1px; color:var(--text-muted); }
+.empty-state{ text-align:center; padding:44px 20px; color:var(--text-muted); border:1px dashed var(--border); border-radius:16px; }
+
+/* ---- Buttons ---- */
+.primary-btn{
+  position:relative; overflow:hidden;
+  background:var(--accent); color:var(--accent-contrast); border:none;
+  padding:14px 22px; min-height:48px; border-radius:100px; font-weight:700;
+  font-family:'Space Grotesk',sans-serif; font-size:15px; cursor:pointer; width:100%; margin-bottom:20px;
+  transition:transform .12s ease, filter .12s ease;
+}
+.primary-btn:hover{ filter:brightness(1.06); }
+.primary-btn:active{ transform:scale(.98); }
+.ghost-btn{ background:transparent; border:1px solid var(--border); color:var(--text); padding:12px 20px; min-height:46px; border-radius:100px; font-weight:600; font-size:14px; cursor:pointer; transition:transform .12s ease, border-color .15s ease, color .15s ease; }
+.ghost-btn:hover{ border-color:var(--accent); color:var(--accent); }
+.ghost-btn:active{ transform:scale(.97); }
+
+details.manage{ border:1px solid var(--border); border-radius:14px; margin-bottom:16px; background:var(--bg-elevated); overflow:hidden; }
+details.manage summary{ cursor:pointer; padding:15px 18px; font-weight:600; font-size:14px; list-style:none; display:flex; align-items:center; justify-content:space-between; }
+details.manage summary::-webkit-details-marker{display:none;}
+details.manage summary:after{content:'+'; color:var(--text-muted); font-size:18px;}
+details.manage[open] summary:after{content:'\2212';}
+.manage-body{ padding:0 18px 18px; }
+
+.admin-row{ display:flex; align-items:center; gap:8px; padding:12px 0; border-bottom:1px solid var(--border-soft); flex-wrap:wrap; }
+.admin-row:last-child{ border-bottom:none; }
+.admin-row .arow-top{ display:flex; align-items:center; gap:8px; flex:1; min-width:150px; }
+.admin-row .arow-name{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:14px; overflow-wrap:anywhere; }
+.admin-row .arow-actions{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-left:auto; }
+.balance-input{ width:76px; font-family:'JetBrains Mono',monospace; font-size:13px; padding:8px 8px; min-height:38px; border-radius:8px; border:1px solid var(--border); background:var(--bg-card); color:var(--text); }
+.small-btn{ font-size:12px; padding:8px 12px; min-height:36px; border-radius:100px; border:1px solid var(--border); background:transparent; color:var(--text); cursor:pointer; white-space:nowrap; transition:transform .12s ease, border-color .15s ease, color .15s ease; }
+.small-btn:hover{ border-color:var(--accent); color:var(--accent); }
+.small-btn:active{ transform:scale(.95); }
+.small-btn.danger:hover{ border-color:#c0392b; color:#c0392b; }
+.small-btn:disabled{ opacity:.5; cursor:default; }
+
+.add-member-form{ display:flex; flex-direction:column; gap:10px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border-soft); }
+.add-member-form .row2{ display:flex; gap:8px; }
+.add-member-form input, .add-member-form select{ font-size:16px; padding:11px 12px; min-height:44px; border-radius:10px; border:1px solid var(--border); background:var(--bg-card); color:var(--text); flex:1; min-width:0; }
+.gen-btn{ background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:0 12px; cursor:pointer; font-size:13px; white-space:nowrap; }
+.form-hint{ font-size:12px; color:var(--text-muted); margin-top:-2px; }
+
+/* ---- Tallying / reveal ---- */
+.tallying{ display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:100px 20px; gap:18px; }
+.spinner{ width:30px; height:30px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+.tallying p{ font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:.05em; color:var(--text-muted); text-transform:uppercase; margin:0; }
+
+.winner-card{ background:var(--bg-card); border:1px solid var(--border); border-radius:20px; padding:34px 22px; text-align:center; margin-bottom:26px; box-shadow:var(--shadow); animation:revealIn .5s cubic-bezier(.16,1,.3,1); }
+.trophy-wrap{ position:relative; display:inline-flex; align-items:center; justify-content:center; width:76px; height:76px; margin-bottom:14px; }
+.trophy-wrap::before{ content:''; position:absolute; inset:-8px; border-radius:50%; background:radial-gradient(circle, rgba(240,93,45,.35), transparent 70%); animation:glowPulse 2.6s ease-in-out infinite; }
+.trophy-wrap .icon{ position:relative; color:var(--accent); }
+.winner-name{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:clamp(22px,6vw,32px); margin:0 0 6px; overflow-wrap:anywhere; }
+.winner-sub{ font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:.05em; color:var(--text-muted); text-transform:uppercase; }
+.winner-bonus{ display:inline-flex; align-items:center; gap:6px; margin-top:14px; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:14px; color:var(--accent); }
+.tie-list{ margin-bottom:22px; }
+.tie-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--border-soft); flex-wrap:wrap; }
+.tie-row:last-child{ border-bottom:none; }
+
+.scoreboard{ margin-bottom:26px; }
+.score-row{ margin-bottom:14px; }
+.score-top{ display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px; gap:8px; }
+.score-top .sname{ font-weight:600; font-family:'Space Grotesk',sans-serif; overflow-wrap:anywhere; }
+.score-top .scount{ font-family:'JetBrains Mono',monospace; color:var(--text-muted); font-size:12px; white-space:nowrap; }
+.score-track{ height:8px; background:var(--bg-elevated); border:1px solid var(--border-soft); border-radius:100px; overflow:hidden; }
+.score-fill{ height:100%; background:var(--accent); width:0%; border-radius:100px; transition:width 1s cubic-bezier(.16,1,.3,1); }
+
+.setup-screen{ max-width:520px; margin:50px auto; text-align:center; padding:0 20px; }
+.setup-screen h1{font-size:21px;}
+.setup-screen code{ background:var(--bg-elevated); border:1px solid var(--border); padding:2px 6px; border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:13px; }
+
+.loading{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; min-height:60vh; }
+.loading-text{ color:var(--text-muted); font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:.05em; text-transform:uppercase; }
+</style>
+
+<div class="spark-layer" id="spark-layer" aria-hidden="true"></div>
+
+<div class="wrap" id="app">
+  <div class="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">Loading</div>
+  </div>
+</div>
+
+<!-- Firebase SDK (real external libraries — leave these as-is) -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+<script>
+/* =====================================================================
+   BLACFOX — STAR WORKER OF THE WEEK
+   -----------------------------------------------------------------
+   ONE-TIME SETUP (~10 minutes):
+   1. console.firebase.google.com → create a free project.
+   2. Build → Firestore Database → Create database (any region).
+   3. Build → Authentication → Sign-in method → enable "Email/Password" AND
+      "Anonymous" (Anonymous is what lets people vote without an account —
+      staff logins still use Email/Password).
+   4. Project settings (gear icon) → General → "Your apps" → web icon </>
+      → register app → copy the firebaseConfig object shown.
+   5. Paste it into FIREBASE_CONFIG below, replacing the placeholders.
+   6. Firestore → Rules → paste the contents of firestore.rules (the file
+      sitting right next to this one) → Publish. If the app ever gets stuck
+      on the loading spinner after logging in, this step is the first thing
+      to check — it means the rules were never published (or expired).
+   7. BOOTSTRAP YOUR OWN OWNER ACCOUNT (one-time, done manually since nobody
+      is admin yet for the app to do it automatically):
+        a) Authentication → Users tab → "Add user" → enter your email + a
+           password → copy the UID it shows you in the table.
+        b) Firestore → Data tab → Start collection → Collection ID: sotw_profiles
+           → Document ID: paste that UID → add fields:
+             name (string)   = your name
+             role (string)   = owner
+             balance (number) = 0
+           → Save.
+   8. Open the app and log in with that email/password. You're now the
+      owner — add the rest of the team from inside the app from here on.
+   ===================================================================== */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDB0AG47o_7WisTKkxCOuc-84z-3Z8yXK8",
+  authDomain: "star-player-of-the-week.firebaseapp.com",
+  projectId: "star-player-of-the-week",
+  storageBucket: "star-player-of-the-week.firebasestorage.app",
+  messagingSenderId: "443331243429",
+  appId: "1:443331243429:web:0b712ec3eb144c4fb20c4c"
+};
+
+const BONUS_AMOUNT = 300; // Blacfox Dollars awarded to the weekly winner
+const LOGO_SRC = "data:image/png;base64,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"; // white logo — the app is fixed-dark everywhere, so this is the only variant in use
+function brandLogo(styleAttr){
+  const s = styleAttr ? ` style="${styleAttr}"` : '';
+  return `<img class="logo"${s} src="${LOGO_SRC}" alt="Blacfox">`;
+}
+
+const ICON_LOCK = '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>';
+const ICON_CHECK = '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,13 9,18 20,6"/></svg>';
+const ICON_WALLET = '<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="16" cy="14.5" r="1.1" fill="currentColor" stroke="none"/></svg>';
+const ICON_TROPHY = '<svg class="icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 0 1-10 0V4Z"/><path d="M7 5H4a3 3 0 0 0 3 3"/><path d="M17 5h3a3 3 0 0 1-3 3"/><path d="M9 17h6"/><path d="M12 13v4"/><path d="M9 21h6"/></svg>';
+
+function initApp(){
+  const NEEDS_SETUP = FIREBASE_CONFIG.apiKey === "PASTE_YOUR_API_KEY_HERE";
+  const appEl = document.getElementById('app');
+  if (!appEl) { console.warn('Blacfox SOTW: #app container not found in the page yet.'); return; }
+
+  if (NEEDS_SETUP) {
+    appEl.innerHTML = `
+      <div class="setup-screen">
+        ${brandLogo('margin-bottom:24px;')}
+        <h1>One setup step left</h1>
+        <p style="color:var(--text-muted);font-size:14px;line-height:1.6;">
+          This app needs a free Firebase project for logins and shared data.
+          Find <code>FIREBASE_CONFIG</code> near the top of this file's script,
+          and follow the numbered steps in the comment right above it.
+        </p>
+      </div>`;
+    return;
+  }
+
+  firebase.initializeApp(FIREBASE_CONFIG);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  const profilesCol = db.collection('sotw_profiles');
+  const myvoteCol = db.collection('sotw_myvote'); // each real logged-in account's own vote — nobody else can ever read these
+  const anonMyvoteCol = db.collection('sotw_anon_myvote'); // votes cast without logging in, keyed by the profile the voter picked
+  const tallyCol = db.collection('sotw_tally');   // anonymous running counts — admin-only, and only once revealed
+  const payoutCol = db.collection('sotw_payout_requests'); // cash-out requests
+  const settingsRef = db.collection('sotw_meta').doc('settings');
+  const ANON_SELF_KEY = 'blacfox_sotw_anon_self';
+
+  const state = {
+    user: null,
+    profiles: {},      // uid -> {name,email,role,balance}
+    settings: { revealed:false, bonusAwardedUids:[], winnerUids:[], totalVotes:0, financeUid:null },
+    myVote: null,      // my own votedForUid, or null
+    tally: {},         // uid -> count — only ever populated for admins, only after reveal
+    payoutQueue: [],       // all requests — only populated for finance/admin
+    myPayout: null,        // my own latest request (any status), everyone tracks their own
+    unsubs: [],
+    tallyUnsub: null,
+    payoutQueueUnsub: null,
+    myPayoutUnsub: null,
+    loadedProfiles:false, loadedSettings:false, loadedMyVote:false, loadedTally:false,
+    loadErrorMsg: null,
+    anonVoteUnsub: null, anonVoteSubUid: undefined, anonVoteLoaded:false, anonVote:null
+  };
+  let uiRevealing = false;
+  let lastRevealedState = false;
+  let gateShowLogin = false; // toggles the logged-out landing screen between "Vote now" and the staff login form
+
+  function esc(s){
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+  function initials(name){
+    return (name||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0].toUpperCase()).join('');
+  }
+  function getWeekLabel(){
+    const now = new Date();
+    const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    const dayNum = (d.getUTCDay() + 6) % 7;
+    d.setUTCDate(d.getUTCDate() - dayNum + 3);
+    const firstThursday = new Date(Date.UTC(d.getUTCFullYear(),0,4));
+    const week = 1 + Math.round(((d - firstThursday) / 86400000 - 3 + (firstThursday.getUTCDay()+6)%7) / 7);
+    return `WEEK ${week} · ${d.getUTCFullYear()}`;
+  }
+  function generatePassword(){
+    const chars='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    let out=''; for(let i=0;i<8;i++) out+=chars[Math.floor(Math.random()*chars.length)];
+    return out;
+  }
+  function isAdmin(profile){
+    return !!profile && (profile.role === 'owner' || profile.role === 'admin');
+  }
+  function isFinanceUid(uid){
+    return !!uid && state.settings.financeUid === uid;
+  }
+  function canManagePayouts(profile, uid){
+    return isAdmin(profile) || isFinanceUid(uid);
+  }
+  function handleErr(err){
+    console.warn('Firestore error:', err && err.message);
+    if (err && err.code === 'permission-denied'){
+      state.loadErrorMsg = 'Permission denied loading data. This almost always means the Firestore Security Rules in your Firebase console are missing or still the default — publish the rules for this app and reload.';
+      render();
+    }
+  }
+
+  function launchSparks(){
+    const layer = document.getElementById('spark-layer');
+    if (!layer) return;
+    const colors = ['var(--accent)', 'rgba(240,93,45,.55)', 'var(--text-muted)'];
+    for (let i=0;i<16;i++){
+      const el = document.createElement('div');
+      el.className = 'spark';
+      const size = 5 + Math.random()*7;
+      el.style.width = size + 'px';
+      el.style.height = size + 'px';
+      el.style.left = (10 + Math.random()*80) + 'vw';
+      el.style.background = colors[Math.floor(Math.random()*colors.length)];
+      const duration = 1.8 + Math.random()*1.4;
+      const delay = Math.random()*0.5;
+      el.style.animationDuration = duration + 's';
+      el.style.animationDelay = delay + 's';
+      layer.appendChild(el);
+      setTimeout(()=>{ if (el.parentNode) el.parentNode.removeChild(el); }, (duration+delay)*1000 + 300);
+    }
+  }
+
+  // ---------------- Auth wiring ----------------
+  function clearSubs(){ state.unsubs.forEach(u=>{ try{u();}catch(e){} }); state.unsubs=[]; }
+  function clearTallySub(){
+    if (state.tallyUnsub){ try{ state.tallyUnsub(); }catch(e){} state.tallyUnsub=null; }
+    state.tally = {}; state.loadedTally = false;
+  }
+  function clearPayoutSubs(){
+    if (state.payoutQueueUnsub){ try{ state.payoutQueueUnsub(); }catch(e){} state.payoutQueueUnsub=null; }
+    if (state.myPayoutUnsub){ try{ state.myPayoutUnsub(); }catch(e){} state.myPayoutUnsub=null; }
+    state.payoutQueue = []; state.myPayout = null;
+  }
+  function clearAnonVoteSub(){
+    if (state.anonVoteUnsub){ try{ state.anonVoteUnsub(); }catch(e){} state.anonVoteUnsub=null; }
+    state.anonVoteSubUid = undefined; state.anonVoteLoaded = false; state.anonVote = null;
+  }
+
+  // A visitor voting without logging in has no profile of their own — the tally/payout
+  // collections are locked to real accounts, so skip subscribing (avoids spurious
+  // permission-denied noise) and just let them vote.
+  function ensureAnonVoteSub(selfUid){
+    if (state.anonVoteSubUid === selfUid) return;
+    if (state.anonVoteUnsub){ try{ state.anonVoteUnsub(); }catch(e){} state.anonVoteUnsub=null; }
+    state.anonVoteSubUid = selfUid;
+    state.anonVoteLoaded = false;
+    state.anonVote = null;
+    if (!selfUid) return;
+    state.anonVoteUnsub = anonMyvoteCol.doc(selfUid).onSnapshot(snap=>{
+      state.anonVote = snap.exists ? snap.data().votedForUid : null;
+      state.anonVoteLoaded = true;
+      render();
+    }, handleErr);
+  }
+
+  // Casting an anonymous vote never reads anyone's vote — old and new tally docs are nudged
+  // with an atomic increment/decrement, same pattern as the logged-in castVote() below.
+  function castAnonVote(selfUid, forUid){
+    const myRef = anonMyvoteCol.doc(selfUid);
+    db.runTransaction(tx => tx.get(myRef).then(snap => {
+      const prev = snap.exists ? snap.data().votedForUid : null;
+      if (prev === forUid) return;
+      tx.set(tallyCol.doc(forUid), { count: firebase.firestore.FieldValue.increment(1) }, { merge:true });
+      if (prev){
+        tx.set(tallyCol.doc(prev), { count: firebase.firestore.FieldValue.increment(-1) }, { merge:true });
+      }
+      tx.set(myRef, { votedForUid: forUid, ts: firebase.firestore.FieldValue.serverTimestamp() });
+    })).catch(err=>alert(err.message));
+  }
+
+  // Only admins ever subscribe to the tally, and only once revealed — everyone else
+  // just reads settings.winnerUids / settings.totalVotes, which never expose per-person data.
+  function maybeManageTally(){
+    if (!state.loadedProfiles || !state.loadedSettings || state.user.isAnonymous) return;
+    const me = state.profiles[state.user.uid];
+    const shouldSubscribe = state.settings.revealed && isAdmin(me);
+    if (shouldSubscribe && !state.tallyUnsub){
+      state.loadedTally = false;
+      state.tallyUnsub = tallyCol.onSnapshot(snap=>{
+        const t={}; snap.forEach(d=>t[d.id]=d.data().count||0);
+        state.tally = t; state.loadedTally = true; render();
+      }, handleErr);
+    } else if (!shouldSubscribe && state.tallyUnsub){
+      clearTallySub();
+    }
+  }
+
+  // Only the assigned finance person (or an admin) ever sees the full payout queue.
+  // Everyone tracks just their own latest request separately.
+  function maybeManagePayouts(){
+    if (!state.loadedProfiles || !state.loadedSettings || state.user.isAnonymous) return;
+    const me = state.profiles[state.user.uid];
+    const canManage = canManagePayouts(me, state.user.uid);
+    if (canManage && !state.payoutQueueUnsub){
+      state.payoutQueueUnsub = payoutCol.onSnapshot(snap=>{
+        const list = [];
+        snap.forEach(d => list.push(Object.assign({ id:d.id }, d.data())));
+        list.sort((a,b) => (a.status==='pending'?0:1) - (b.status==='pending'?0:1));
+        state.payoutQueue = list; render();
+      }, handleErr);
+    } else if (!canManage && state.payoutQueueUnsub){
+      state.payoutQueueUnsub(); state.payoutQueueUnsub = null; state.payoutQueue = [];
+    }
+    if (!state.myPayoutUnsub){
+      state.myPayoutUnsub = payoutCol.where('uid','==', state.user.uid).onSnapshot(snap=>{
+        let pending = null;
+        snap.forEach(d => {
+          const r = Object.assign({ id:d.id }, d.data());
+          if (r.status === 'pending') pending = r;
+        });
+        state.myPayout = pending;
+        render();
+      }, handleErr);
+    }
+  }
+
+  auth.onAuthStateChanged(user => {
+    state.user = user;
+    clearSubs();
+    clearTallySub();
+    clearPayoutSubs();
+    clearAnonVoteSub();
+    if (user){
+      state.loadedProfiles=false; state.loadedSettings=false; state.loadedMyVote=false;
+      state.loadErrorMsg = null;
+      render();
+      const u1 = profilesCol.onSnapshot(snap=>{
+        const p={}; snap.forEach(d=>p[d.id]=d.data()); state.profiles=p; state.loadedProfiles=true;
+        state.loadErrorMsg = null;
+        maybeManageTally(); maybeManagePayouts(); render();
+      }, handleErr);
+      const u2 = settingsRef.onSnapshot(snap=>{
+        state.settings = snap.data() || { revealed:false, bonusAwardedUids:[], winnerUids:[], totalVotes:0, financeUid:null };
+        state.loadedSettings=true;
+        maybeManageTally(); maybeManagePayouts(); render();
+      }, handleErr);
+      const u3 = myvoteCol.doc(user.uid).onSnapshot(snap=>{
+        state.myVote = snap.exists ? snap.data().votedForUid : null;
+        state.loadedMyVote=true; render();
+      }, handleErr);
+      state.unsubs=[u1,u2,u3];
+    } else {
+      render();
+    }
+  });
+
+  function login(email,password){ return auth.signInWithEmailAndPassword(email,password); }
+  function logout(){ auth.signOut(); }
+  function startVotingWithoutLogin(){ return auth.signInAnonymously(); }
+  function forgotPassword(email){
+    if(!email){ alert('Enter your email above first, then click "Forgot password?" again.'); return; }
+    auth.sendPasswordResetEmail(email)
+      .then(()=>alert('Check your email for a password reset link.'))
+      .catch(err=>alert(err.message));
+  }
+
+  // ---------------- Admin actions ----------------
+  function createTeamMember(name, email, password, role){
+    const secondaryApp = firebase.initializeApp(FIREBASE_CONFIG, 'Secondary_' + Date.now());
+    return secondaryApp.auth().createUserWithEmailAndPassword(email, password)
+      .then(cred => {
+        const uid = cred.user.uid;
+        return secondaryApp.auth().signOut().then(()=>uid);
+      })
+      .then(uid => profilesCol.doc(uid).set({ name:name, email:email, role:role, balance:0 }))
+      .finally(()=> secondaryApp.delete().catch(()=>{}));
+  }
+  function removeTeammate(uid){
+    // Note: if they'd already voted this week, that vote's count stays in the anonymous
+    // tally — it can't be reversed without knowing who they picked, which nobody is allowed to see.
+    profilesCol.doc(uid).delete()
+      .then(()=> myvoteCol.doc(uid).delete().catch(()=>{}))
+      .catch(err=>alert('Could not remove: ' + err.message));
+  }
+  function setRole(uid, newRole){
+    profilesCol.doc(uid).update({ role:newRole }).catch(err=>alert(err.message));
+  }
+  function setFinanceHolder(uid){
+    const next = state.settings.financeUid === uid ? null : uid;
+    settingsRef.set({ financeUid: next }, { merge:true }).catch(err=>alert(err.message));
+  }
+  function updateBalance(uid, value){
+    const n = Number(value);
+    if (isNaN(n)) return;
+    profilesCol.doc(uid).update({ balance:n }).catch(err=>alert(err.message));
+  }
+
+  // ---------------- Payouts ----------------
+  function requestCashout(){
+    const me = state.profiles[state.user.uid];
+    if (!me || !(me.balance > 0) || state.myPayout) return;
+    payoutCol.add({
+      uid: state.user.uid,
+      name: me.name,
+      amount: me.balance,
+      status: 'pending',
+      requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      resolvedAt: null,
+      resolvedBy: null
+    }).catch(err=>alert(err.message));
+  }
+  function cancelCashout(reqId){
+    payoutCol.doc(reqId).update({ status:'cancelled', resolvedAt: firebase.firestore.FieldValue.serverTimestamp() })
+      .catch(err=>alert(err.message));
+  }
+  function approvePayout(reqId){
+    const reqRef = payoutCol.doc(reqId);
+    db.runTransaction(tx => tx.get(reqRef).then(reqSnap => {
+      if (!reqSnap.exists) return;
+      const req = reqSnap.data();
+      if (req.status !== 'pending') return;
+      const profRef = profilesCol.doc(req.uid);
+      return tx.get(profRef).then(profSnap => {
+        const bal = (profSnap.data() && profSnap.data().balance) || 0;
+        if (bal < req.amount){
+          throw new Error(`${req.name}'s balance is now only B$${bal} — lower than this B$${req.amount} request. Reject it or adjust their balance first.`);
+        }
+        tx.update(profRef, { balance: bal - req.amount });
+        tx.update(reqRef, {
+          status:'paid',
+          resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          resolvedBy: state.user.uid
+        });
+      });
+    })).catch(err=>alert(err.message));
+  }
+  function rejectPayout(reqId){
+    payoutCol.doc(reqId).update({
+      status:'rejected',
+      resolvedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      resolvedBy: state.user.uid
+    }).catch(err=>alert(err.message));
+  }
+
+  // ---------------- Voting ----------------
+  // Casting a vote never reads anyone's vote — old and new tally docs are nudged with an
+  // atomic increment/decrement, so the only read in this transaction is your own vote record.
+  function castVote(forUid){
+    const myVoteRef = myvoteCol.doc(state.user.uid);
+    db.runTransaction(tx => {
+      return tx.get(myVoteRef).then(myVoteSnap => {
+        const prev = myVoteSnap.exists ? myVoteSnap.data().votedForUid : null;
+        if (prev === forUid) return; // no change
+        tx.set(tallyCol.doc(forUid), { count: firebase.firestore.FieldValue.increment(1) }, { merge:true });
+        if (prev){
+          tx.set(tallyCol.doc(prev), { count: firebase.firestore.FieldValue.increment(-1) }, { merge:true });
+        }
+        tx.set(myVoteRef, { votedForUid: forUid, ts: firebase.firestore.FieldValue.serverTimestamp() });
+      });
+    }).catch(err=>alert(err.message));
+  }
+
+  // Reveal happens in two steps: (1) atomically flip revealed so only one admin's click
+  // proceeds even if two click at once, then (2) read the now-unlocked tally, work out the
+  // winner, and store just their name in settings (never the per-person breakdown) so
+  // regular members only ever learn who won, never the numbers.
+  function doReveal(){
+    db.runTransaction(tx => tx.get(settingsRef).then(sSnap => {
+      const s = sSnap.data() || {};
+      if (s.revealed) return false;
+      tx.set(settingsRef, { revealed:true }, { merge:true });
+      return true;
+    })).then(didReveal => {
+      if (!didReveal) return;
+      return tallyCol.get().then(tallySnap => {
+        const tally = {};
+        tallySnap.forEach(d => tally[d.id] = d.data().count || 0);
+        Object.keys(state.profiles).forEach(uid => { if (!(uid in tally)) tally[uid] = 0; });
+        const entries = Object.entries(tally);
+        const total = entries.reduce((a,[,c])=>a+c,0);
+        const top = total > 0 ? Math.max(...entries.map(([,c])=>c)) : 0;
+        const winnerUids = total > 0 ? entries.filter(([,c])=>c===top).map(([uid])=>uid) : [];
+        return settingsRef.set({ winnerUids, totalVotes: total }, { merge:true }).then(() => {
+          if (winnerUids.length === 1){
+            const wUid = winnerUids[0];
+            const wRef = profilesCol.doc(wUid);
+            return db.runTransaction(tx => tx.get(wRef).then(pSnap => {
+              const cur = (pSnap.data() && pSnap.data().balance) || 0;
+              tx.update(wRef, { balance: cur + BONUS_AMOUNT });
+              const payoutRef = db.collection('sotw_payouts').doc();
+              tx.set(payoutRef, {
+                uid: wUid,
+                name: (pSnap.data() && pSnap.data().name) || '',
+                amount: BONUS_AMOUNT,
+                week: getWeekLabel(),
+                ts: firebase.firestore.FieldValue.serverTimestamp()
+              });
+            }));
+          }
+        });
+      });
+    }).catch(err=>alert('Could not reveal: ' + err.message));
+  }
+
+  function onRevealClick(){
+    uiRevealing = true;
+    render();
+    setTimeout(()=>{ uiRevealing = false; doReveal(); }, 1100);
+  }
+
+  function awardBonus(uid){
+    const already = (state.settings.bonusAwardedUids||[]).includes(uid);
+    if (already) return;
+    const profile = state.profiles[uid];
+    if (!profile) return;
+    const batch = db.batch();
+    batch.update(profilesCol.doc(uid), { balance: (profile.balance||0) + BONUS_AMOUNT });
+    const payoutRef = db.collection('sotw_payouts').doc();
+    batch.set(payoutRef, { uid, name:profile.name, amount:BONUS_AMOUNT, week:getWeekLabel(), ts:firebase.firestore.FieldValue.serverTimestamp() });
+    batch.set(settingsRef, { bonusAwardedUids: firebase.firestore.FieldValue.arrayUnion(uid) }, { merge:true });
+    batch.commit().catch(err=>alert('Could not award bonus: ' + err.message));
+  }
+
+  function startNewWeek(){
+    const batch = db.batch();
+    Object.keys(state.profiles).forEach(uid => { batch.delete(myvoteCol.doc(uid)); batch.delete(anonMyvoteCol.doc(uid)); });
+    tallyCol.get().then(tallySnap => {
+      tallySnap.forEach(doc => batch.delete(doc.ref));
+      return batch.commit();
+    }).then(()=>{
+      settingsRef.set({ revealed:false, bonusAwardedUids:[], winnerUids:[], totalVotes:0 }, { merge:true });
+    }).catch(err=>alert('Could not start new week: ' + err.message));
+  }
+
+  // ---------------- Render ----------------
+  function render(){
+    if (!state.user){ renderGate(); return; }
+    if (!state.loadedProfiles || !state.loadedSettings || !state.loadedMyVote){
+      appEl.innerHTML = `<div class="loading"><div class="spinner"></div><div class="loading-text">Loading</div>${state.loadErrorMsg ? `<p style="color:var(--accent);font-size:13px;max-width:320px;text-align:center;line-height:1.5;">${esc(state.loadErrorMsg)}</p>` : ''}</div>`;
+      return;
+    }
+    if (uiRevealing){ renderTallying(); return; }
+
+    if (state.user.isAnonymous){ renderAnonVote(); return; }
+
+    const me = state.profiles[state.user.uid];
+    if (!me){ renderNoAccess(); return; }
+
+    const nowRevealed = !!state.settings.revealed;
+    const admin = isAdmin(me);
+
+    if (nowRevealed && admin && !state.loadedTally){
+      appEl.innerHTML = `<div class="loading"><div class="spinner"></div><div class="loading-text">Loading</div></div>`;
+      return;
+    }
+    if (nowRevealed && !lastRevealedState){
+      setTimeout(launchSparks, 50);
+    }
+    lastRevealedState = nowRevealed;
+
+    if (nowRevealed){ renderReveal(me); } else { renderMain(me); }
+  }
+
+  function renderTallying(){
+    appEl.innerHTML = `
+      <div class="tallying">
+        <div class="spinner"></div>
+        <p>Tallying the votes</p>
+      </div>`;
+  }
+
+  function renderGate(){
+    if (gateShowLogin){ renderLogin(); return; }
+    appEl.innerHTML = `
+      <div class="gate burst">
+        <div class="gate-inner">
+          ${brandLogo()}
+          <p class="gate-eyebrow">${getWeekLabel()}</p>
+          <h1>Star Worker of the Week</h1>
+          <p class="gate-body">Cast one vote for a teammate. The winner takes home B$${BONUS_AMOUNT} in Blacfox Dollars.</p>
+          <div class="gate-actions">
+            <button class="gate-btn primary" id="gate-vote-btn">Vote now</button>
+            <button class="gate-btn ghost" id="gate-login-btn">Log in to check balance</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('gate-vote-btn').addEventListener('click', () => {
+      startVotingWithoutLogin().catch(err => alert(err.message));
+    });
+    document.getElementById('gate-login-btn').addEventListener('click', () => {
+      gateShowLogin = true; render();
+    });
+  }
+
+  function renderLogin(){
+    appEl.innerHTML = `
+      <div class="gate burst">
+        <div class="gate-inner">
+          ${brandLogo()}
+          <h1>Sign in</h1>
+          <p class="gate-body" style="margin-bottom:24px;">Enter your email and password to continue.</p>
+          <div class="login-error" id="login-error"></div>
+          <form id="login-form">
+            <div class="field">
+              <label for="login-email">Email</label>
+              <input type="email" id="login-email" autocomplete="username" inputmode="email" autocapitalize="none" required>
+            </div>
+            <div class="field">
+              <label for="login-pw">Password</label>
+              <div class="pw-wrap">
+                <input type="password" id="login-pw" autocomplete="current-password" required>
+                <button type="button" class="pw-toggle" id="pw-toggle" aria-label="Show password">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+            <button type="submit" class="gate-btn primary">Log in</button>
+          </form>
+          <button class="forgot-link" id="forgot-btn">Forgot password?</button>
+          <button class="forgot-link" id="gate-back-btn">‹ Back to voting</button>
+        </div>
+      </div>`;
+
+    document.getElementById('pw-toggle').addEventListener('click', () => {
+      const pw = document.getElementById('login-pw');
+      pw.type = pw.type === 'password' ? 'text' : 'password';
+    });
+    document.getElementById('forgot-btn').addEventListener('click', () => {
+      forgotPassword(document.getElementById('login-email').value.trim());
+    });
+    document.getElementById('gate-back-btn').addEventListener('click', () => {
+      gateShowLogin = false; render();
+    });
+    document.getElementById('login-form').addEventListener('submit', e => {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value.trim();
+      const pw = document.getElementById('login-pw').value;
+      const errEl = document.getElementById('login-error');
+      errEl.textContent = '';
+      login(email, pw).catch(err => {
+        const map = {
+          'auth/wrong-password':'Incorrect email or password.',
+          'auth/user-not-found':'Incorrect email or password.',
+          'auth/invalid-email':'That email address looks invalid.',
+          'auth/too-many-requests':'Too many attempts — wait a bit and try again.'
+        };
+        errEl.textContent = map[err.code] || err.message;
+      });
+    });
+  }
+
+  function renderAnonVote(){
+    const storedUid = localStorage.getItem(ANON_SELF_KEY);
+    const selfUid = (storedUid && state.profiles[storedUid]) ? storedUid : null;
+    ensureAnonVoteSub(selfUid);
+
+    if (state.settings.revealed){
+      appEl.innerHTML = `
+        <div class="gate burst">
+          <div class="gate-inner">
+            ${brandLogo()}
+            <h1>Results are in</h1>
+            <p class="gate-body">This week's Star Worker has already been revealed. Log in to check your Blacfox Dollar balance.</p>
+            <div class="gate-actions">
+              <button class="gate-btn ghost" id="anon-login-btn">Log in</button>
+            </div>
+          </div>
+        </div>`;
+      document.getElementById('anon-login-btn').addEventListener('click', () => { gateShowLogin = true; logout(); });
+      return;
+    }
+
+    if (!selfUid){
+      const rows = Object.entries(state.profiles)
+        .sort((a,b)=>a[1].name.localeCompare(b[1].name))
+        .map(([uid,p]) => `
+          <button class="vote-card" data-pick="${uid}" style="cursor:pointer;text-align:left;width:100%;">
+            <div class="avatar">${initials(p.name)}</div>
+            <div class="name">${esc(p.name)}</div>
+          </button>`).join('');
+      appEl.innerHTML = `
+        <div class="topbar">
+          <div class="brand">${brandLogo()}</div>
+          <span class="week-label">${getWeekLabel()}</span>
+        </div>
+        <h1>Who are you?</h1>
+        <p class="subhead">Pick your name to vote for a teammate. No password needed.</p>
+        <div class="vote-grid">${rows || '<div class="empty-state">No teammates set up yet.</div>'}</div>
+        <button class="ghost-btn full-btn" id="anon-login-btn2" style="margin-top:8px;">Log in instead</button>
+      `;
+      appEl.querySelectorAll('[data-pick]').forEach(btn => btn.addEventListener('click', () => {
+        localStorage.setItem(ANON_SELF_KEY, btn.dataset.pick); render();
+      }));
+      document.getElementById('anon-login-btn2').addEventListener('click', () => { gateShowLogin = true; logout(); });
+      return;
+    }
+
+    if (!state.anonVoteLoaded){
+      appEl.innerHTML = `<div class="loading"><div class="spinner"></div><div class="loading-text">Loading</div></div>`;
+      return;
+    }
+
+    const me = state.profiles[selfUid];
+    const others = Object.entries(state.profiles).filter(([uid]) => uid !== selfUid);
+    const myVote = state.anonVote;
+
+    appEl.innerHTML = `
+      <div class="topbar">
+        <div class="brand">${brandLogo()}</div>
+        <span class="week-label">${getWeekLabel()}</span>
+      </div>
+      <div class="who-row">
+        <span class="whoname">Voting as ${esc(me.name)}</span>
+        <button class="logout-link" id="anon-switch-btn">Not you?</button>
+      </div>
+      <h1>Star Worker of the Week</h1>
+      <p class="subhead">Vote for the teammate who went above and beyond this week. The winner receives B$${BONUS_AMOUNT}. Results stay hidden until an admin reveals them.</p>
+
+      ${others.length === 0 ? `
+        <div class="empty-state">No other teammates yet.</div>
+      ` : `
+        <div class="vote-grid">
+          ${others.map(([uid,p]) => `
+            <div class="vote-card ${myVote===uid ? 'selected' : ''}">
+              <div class="avatar">${initials(p.name)}</div>
+              <div class="name">${esc(p.name)}</div>
+              <button class="vote-btn ${myVote===uid ? 'voted' : ''}" data-vote="${uid}">${myVote===uid ? ICON_CHECK + ' Voted' : 'Vote'}</button>
+            </div>
+          `).join('')}
+        </div>
+        <div class="lock-note">${ICON_LOCK}<span>${myVote ? "Your vote is locked in." : "You haven't voted yet."} Only admins can reveal the results, and only once they choose to.</span></div>
+      `}
+
+      <button class="ghost-btn full-btn" id="anon-login-btn3">Log in to check your balance / cash out</button>
+    `;
+    document.getElementById('anon-switch-btn').addEventListener('click', () => {
+      localStorage.removeItem(ANON_SELF_KEY); render();
+    });
+    appEl.querySelectorAll('[data-vote]').forEach(btn => btn.addEventListener('click', () => castAnonVote(selfUid, btn.dataset.vote)));
+    document.getElementById('anon-login-btn3').addEventListener('click', () => { gateShowLogin = true; logout(); });
+  }
+
+  function renderNoAccess(){
+    appEl.innerHTML = `
+      <div class="gate burst">
+        <div class="gate-inner">
+          ${brandLogo()}
+          <h1>No access yet</h1>
+          <p class="gate-body">Your account isn't linked to a profile in this app. Ask an admin to add you, or confirm you're using the right email.</p>
+          <div class="gate-actions">
+            <button class="gate-btn ghost" id="logout-btn2">Log out</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('logout-btn2').addEventListener('click', logout);
+  }
+
+  function header(me){
+    return `
+      <div class="topbar">
+        <div class="brand">${brandLogo()}</div>
+        <div class="topbar-right">
+          <span class="week-label">${getWeekLabel()}</span>
+          <span class="wallet-chip">${ICON_WALLET} B$${(me.balance||0).toLocaleString()}</span>
+        </div>
+      </div>
+      <div class="who-row">
+        <span class="whoname">${esc(me.name)}</span>
+        ${me.role==='owner' ? '<span class="badge owner">Owner</span>' : ''}
+        ${me.role==='admin' ? '<span class="badge admin">Admin</span>' : ''}
+        <button class="logout-link" id="logout-btn">Log out</button>
+      </div>`;
+  }
+
+  function manageTeamHTML(){
+    const rows = Object.entries(state.profiles)
+      .sort((a,b)=>a[1].name.localeCompare(b[1].name))
+      .map(([uid,p]) => {
+        const isOwnerRow = p.role === 'owner';
+        const holdsFinance = isFinanceUid(uid);
+        return `
+        <div class="admin-row">
+          <div class="arow-top">
+            <span class="arow-name">${esc(p.name)}</span>
+            ${isOwnerRow ? '<span class="badge owner">Owner</span>' : (p.role==='admin' ? '<span class="badge admin">Admin</span>' : '')}
+            ${holdsFinance ? '<span class="badge finance">Finance</span>' : ''}
+          </div>
+          <div class="arow-actions">
+            <input type="number" class="balance-input" data-balance="${uid}" value="${p.balance||0}" title="Balance (B$)">
+            ${!isOwnerRow ? `<button class="small-btn" data-role-toggle="${uid}" data-current-role="${p.role}">${p.role==='admin' ? 'Remove admin' : 'Make admin'}</button>` : ''}
+            <button class="small-btn" data-finance-toggle="${uid}">${holdsFinance ? 'Remove finance' : 'Make finance'}</button>
+            ${!isOwnerRow ? `<button class="small-btn danger" data-remove="${uid}">Remove</button>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+
+    return `
+      <details class="manage">
+        <summary>Team &amp; balances</summary>
+        <div class="manage-body">
+          ${rows || '<p style="color:var(--text-muted);font-size:13px;">No teammates yet.</p>'}
+          <div class="add-member-form">
+            <div class="row2"><input type="text" id="new-name" placeholder="Full name"></div>
+            <div class="row2"><input type="email" id="new-email" placeholder="Email address" autocapitalize="none"></div>
+            <div class="row2">
+              <input type="text" id="new-pw" placeholder="Temporary password">
+              <button type="button" class="gen-btn" id="gen-pw-btn">Generate</button>
+            </div>
+            <div class="row2">
+              <select id="new-role">
+                <option value="member">Member</option>
+                <option value="admin">Admin</option>
+              </select>
+              <button type="button" class="ghost-btn" id="add-member-btn" style="min-width:110px;">Add</button>
+            </div>
+            <p class="form-hint">Share the temporary password with them directly. They can reset it anytime from the login screen.</p>
+          </div>
+        </div>
+      </details>`;
+  }
+
+  function payoutQueueHTML(){
+    const pending = state.payoutQueue.filter(r => r.status === 'pending');
+    const history = state.payoutQueue.filter(r => r.status !== 'pending').slice(0, 8);
+
+    const rowHTML = (r, withActions) => `
+      <div class="admin-row">
+        <div class="arow-top">
+          <span class="arow-name">${esc(r.name)}</span>
+          <span class="badge ${r.status==='paid'?'owner':''}" style="${r.status!=='paid' && r.status!=='pending' ? 'border:1px solid var(--border);color:var(--text-muted);' : ''}">${esc(r.status)}</span>
+        </div>
+        <div class="arow-actions">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:13px;">B$${r.amount}</span>
+          ${withActions ? `
+            <button class="small-btn" data-approve="${r.id}">Approve</button>
+            <button class="small-btn danger" data-reject="${r.id}">Reject</button>
+          ` : ''}
+        </div>
+      </div>`;
+
+    return `
+      <details class="manage">
+        <summary>Payout requests${pending.length ? ` (${pending.length})` : ''}</summary>
+        <div class="manage-body">
+          ${pending.length ? pending.map(r=>rowHTML(r,true)).join('') : '<p style="color:var(--text-muted);font-size:13px;">Nothing awaiting approval.</p>'}
+          ${history.length ? `<p class="form-hint" style="margin-top:14px;">Recent history</p>${history.map(r=>rowHTML(r,false)).join('')}` : ''}
+        </div>
+      </details>`;
+  }
+
+  function bindPayoutQueue(){
+    appEl.querySelectorAll('[data-approve]').forEach(btn => btn.addEventListener('click', () => approvePayout(btn.dataset.approve)));
+    appEl.querySelectorAll('[data-reject]').forEach(btn => {
+      btn.addEventListener('click', () => { if (confirm('Reject this payout request?')) rejectPayout(btn.dataset.reject); });
+    });
+  }
+
+  function bindManageTeam(){
+    appEl.querySelectorAll('[data-balance]').forEach(inp => {
+      inp.addEventListener('change', () => updateBalance(inp.dataset.balance, inp.value));
+    });
+    appEl.querySelectorAll('[data-role-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const next = btn.dataset.currentRole === 'admin' ? 'member' : 'admin';
+        setRole(btn.dataset.roleToggle, next);
+      });
+    });
+    appEl.querySelectorAll('[data-finance-toggle]').forEach(btn => {
+      btn.addEventListener('click', () => setFinanceHolder(btn.dataset.financeToggle));
+    });
+    appEl.querySelectorAll('[data-remove]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p = state.profiles[btn.dataset.remove];
+        if (confirm(`Remove ${p ? p.name : 'this person'} from the team? They'll lose access immediately.`)) {
+          removeTeammate(btn.dataset.remove);
+        }
+      });
+    });
+    const genBtn = document.getElementById('gen-pw-btn');
+    if (genBtn) genBtn.addEventListener('click', () => { document.getElementById('new-pw').value = generatePassword(); });
+    const addBtn = document.getElementById('add-member-btn');
+    if (addBtn) addBtn.addEventListener('click', () => {
+      const name = document.getElementById('new-name').value.trim();
+      const email = document.getElementById('new-email').value.trim();
+      const pw = document.getElementById('new-pw').value;
+      const role = document.getElementById('new-role').value;
+      if (!name || !email || !pw){ alert('Fill in name, email and a temporary password first.'); return; }
+      if (pw.length < 6){ alert('Password needs to be at least 6 characters.'); return; }
+      addBtn.disabled = true; addBtn.textContent = 'Adding…';
+      createTeamMember(name, email, pw, role)
+        .then(() => {
+          document.getElementById('new-name').value='';
+          document.getElementById('new-email').value='';
+          document.getElementById('new-pw').value='';
+        })
+        .catch(err => alert('Could not add teammate: ' + err.message))
+        .finally(() => { addBtn.disabled=false; addBtn.textContent='Add'; });
+    });
+  }
+
+  function renderMain(me){
+    const others = Object.entries(state.profiles).filter(([uid]) => uid !== state.user.uid);
+    const myVote = state.myVote;
+    const admin = isAdmin(me);
+    const financeAccess = canManagePayouts(me, state.user.uid);
+    const financeName = state.settings.financeUid ? (state.profiles[state.settings.financeUid] || {}).name : null;
+
+    let cashoutHTML;
+    if (state.myPayout){
+      cashoutHTML = `
+        <div class="balance-card">
+          <div class="balance-card-top"><span class="balance-label">Your balance</span><span class="balance-amount">B$${(me.balance||0).toLocaleString()}</span></div>
+          <div class="balance-status">Cash-out of B$${state.myPayout.amount} requested — awaiting review</div>
+          <button class="small-btn" id="cancel-cashout-btn">Cancel request</button>
+        </div>`;
+    } else if (me.balance > 0){
+      cashoutHTML = `
+        <div class="balance-card">
+          <div class="balance-card-top"><span class="balance-label">Your balance</span><span class="balance-amount">B$${(me.balance||0).toLocaleString()}</span></div>
+          <button class="ghost-btn" id="cashout-btn">Cash Out</button>
+        </div>`;
+    } else {
+      cashoutHTML = '';
+    }
+
+    appEl.innerHTML = header(me) + `
+      <h1>Star Worker of the Week</h1>
+      <p class="subhead">Vote for the teammate who went above and beyond this week. The winner receives B$${BONUS_AMOUNT}. Results stay hidden until an admin reveals them.</p>
+
+      ${cashoutHTML}
+
+      ${others.length === 0 ? `
+        <div class="empty-state">Add more teammates below before voting can start.</div>
+      ` : `
+        <div class="vote-grid">
+          ${others.map(([uid,p]) => `
+            <div class="vote-card ${myVote===uid ? 'selected' : ''}">
+              <div class="avatar">${initials(p.name)}</div>
+              <div class="name">${esc(p.name)}</div>
+              <button class="vote-btn ${myVote===uid ? 'voted' : ''}" data-vote="${uid}">${myVote===uid ? ICON_CHECK + ' Voted' : 'Vote'}</button>
+            </div>
+          `).join('')}
+        </div>
+        <div class="lock-note">${ICON_LOCK}<span>${myVote ? "Your vote is locked in." : "You haven't voted yet."} Only admins can reveal the results, and only once they choose to.</span></div>
+      `}
+
+      ${admin ? `<button class="primary-btn" id="reveal-btn">Reveal Results</button>` : ''}
+      ${financeAccess ? payoutQueueHTML() : ''}
+      ${admin ? manageTeamHTML() : ''}
+    `;
+
+    document.getElementById('logout-btn').addEventListener('click', logout);
+    appEl.querySelectorAll('[data-vote]').forEach(btn => btn.addEventListener('click', () => castVote(btn.dataset.vote)));
+    const revealBtn = document.getElementById('reveal-btn');
+    if (revealBtn) revealBtn.addEventListener('click', onRevealClick);
+    const cashoutBtn = document.getElementById('cashout-btn');
+    if (cashoutBtn) cashoutBtn.addEventListener('click', () => {
+      if (confirm(`Request a cash-out of B$${me.balance}?${financeName ? ' ' + financeName + ' will review it.' : ''}`)) requestCashout();
+    });
+    const cancelBtn = document.getElementById('cancel-cashout-btn');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => { if (state.myPayout) cancelCashout(state.myPayout.id); });
+    if (financeAccess) bindPayoutQueue();
+    if (admin) bindManageTeam();
+  }
+
+  function renderReveal(me){
+    const admin = isAdmin(me);
+    const financeAccess = canManagePayouts(me, state.user.uid);
+    const total = state.settings.totalVotes || 0;
+    const winnerUids = state.settings.winnerUids || [];
+
+    let winnerBlock;
+    if (total === 0){
+      winnerBlock = `<div class="empty-state">No votes were cast this week.</div>`;
+    } else if (winnerUids.length === 1){
+      const wp = state.profiles[winnerUids[0]];
+      winnerBlock = `
+        <div class="winner-card burst">
+          <div class="trophy-wrap">${ICON_TROPHY}</div>
+          <p class="winner-name">${esc(wp ? wp.name : 'Unknown')}</p>
+          <p class="winner-sub">Star Worker of the Week</p>
+          <p class="winner-bonus">${ICON_WALLET} + B$${BONUS_AMOUNT} awarded</p>
+        </div>`;
+    } else {
+      winnerBlock = `
+        <div class="winner-card burst">
+          <div class="trophy-wrap">${ICON_TROPHY}</div>
+          <p class="winner-name">It's a tie</p>
+          <p class="winner-sub">${winnerUids.map(u => esc(state.profiles[u] ? state.profiles[u].name : '?')).join(' · ')}</p>
+        </div>
+        ${admin ? `
+          <div class="tie-list">
+            ${winnerUids.map(uid => {
+              const p = state.profiles[uid];
+              const awarded = (state.settings.bonusAwardedUids||[]).includes(uid);
+              return `<div class="tie-row">
+                <span>${esc(p ? p.name : '?')}</span>
+                <button class="small-btn" data-award="${uid}" ${awarded?'disabled':''}>${awarded ? 'Awarded' : `Award B$${BONUS_AMOUNT}`}</button>
+              </div>`;
+            }).join('')}
+          </div>
+        ` : ''}`;
+    }
+
+    // Only admins ever see the per-person breakdown — everyone else just sees the winner above.
+    const scoreboardHTML = (admin && state.loadedTally) ? `
+      <div class="scoreboard">
+        ${Object.entries(state.profiles).map(([uid,p]) => {
+          const count = state.tally[uid] || 0;
+          const pct = total ? Math.round(count/total*100) : 0;
+          return `<div class="score-row">
+            <div class="score-top">
+              <span class="sname">${esc(p.name)}</span>
+              <span class="scount">${count} vote${count===1?'':'s'}</span>
+            </div>
+            <div class="score-track"><div class="score-fill" data-pct="${pct}"></div></div>
+          </div>`;
+        }).join('')}
+      </div>
+    ` : '';
+
+    appEl.innerHTML = header(me) + `
+      <p class="eyebrow">Results</p>
+      <h1>${total} vote${total===1?'':'s'} cast this week</h1>
+      ${winnerBlock}
+      ${scoreboardHTML}
+      ${admin ? `<button class="ghost-btn" id="newweek-btn">Start New Week</button>` : ''}
+      ${financeAccess ? payoutQueueHTML() : ''}
+      ${admin ? manageTeamHTML() : ''}
+    `;
+
+    document.getElementById('logout-btn').addEventListener('click', logout);
+    const nw = document.getElementById('newweek-btn');
+    if (nw) nw.addEventListener('click', () => { if (confirm("Clear this week's votes and start fresh?")) startNewWeek(); });
+    appEl.querySelectorAll('[data-award]').forEach(btn => btn.addEventListener('click', () => awardBonus(btn.dataset.award)));
+    if (financeAccess) bindPayoutQueue();
+    if (admin) bindManageTeam();
+
+    requestAnimationFrame(() => {
+      appEl.querySelectorAll('.score-fill').forEach(el => { el.style.width = el.dataset.pct + '%'; });
+    });
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
+</script>

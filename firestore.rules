@@ -1,0 +1,96 @@
+rules_version = '2';
+
+// Blacfox — Star Worker of the Week
+// -----------------------------------------------------------------
+// HOW TO PUBLISH:
+//   Firebase console → your project → Build → Firestore Database → Rules tab
+//   → paste this entire file, replacing whatever is there → Publish.
+//
+// If the app is stuck on the loading spinner after logging in, this is almost
+// always the cause: Firestore projects start with rules that block every
+// read/write (or expire after 30 days), and index.html never got these rules
+// published on top of that.
+// -----------------------------------------------------------------
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function profileExists(uid) {
+      return exists(/databases/$(database)/documents/sotw_profiles/$(uid));
+    }
+    function myRole() {
+      return profileExists(request.auth.uid)
+        ? get(/databases/$(database)/documents/sotw_profiles/$(request.auth.uid)).data.role
+        : '';
+    }
+    function isAdmin() {
+      return signedIn() && myRole() in ['owner', 'admin'];
+    }
+    function isFinance() {
+      return signedIn()
+        && get(/databases/$(database)/documents/sotw_meta/settings).data.financeUid == request.auth.uid;
+    }
+    function isRealAccount() {
+      // true for email/password accounts; false for the anonymous sessions used to vote without logging in
+      return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
+
+    // Team roster — everyone signed in (including anonymous voters) needs to read
+    // this to see names on the vote screen. Only an owner/admin can create, edit,
+    // or remove a profile.
+    match /sotw_profiles/{uid} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // Each real logged-in account's own vote. Nobody else — not even admins — can
+    // ever read another person's pick.
+    match /sotw_myvote/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Votes cast without logging in. There's no password to check identity against,
+    // so — by design — any signed-in (including anonymous) session may read/write
+    // any doc here; the app itself only ever writes to the doc matching whichever
+    // name the visitor picked. This is the deliberate trade-off of dropping the
+    // login requirement for voting: convenience over strict per-person enforcement.
+    match /sotw_anon_myvote/{uid} {
+      allow read, write: if signedIn() && profileExists(uid);
+    }
+
+    // Anonymous running vote counts. Anyone signed in (real or anonymous) can nudge
+    // a count when casting a vote, but only admins can ever read the breakdown —
+    // and only the app's own logic decides when (after reveal).
+    match /sotw_tally/{uid} {
+      allow read: if isAdmin();
+      allow write: if signedIn();
+    }
+
+    match /sotw_meta/{doc} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    // Cash-out requests. Only real accounts may request one for themselves; the
+    // requester can read/cancel their own, admins and the assigned finance holder
+    // can read/approve/reject any.
+    match /sotw_payout_requests/{id} {
+      allow read: if isAdmin() || isFinance() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow create: if isRealAccount() && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.status == 'pending';
+      allow update: if isAdmin() || isFinance()
+                    || (signedIn() && resource.data.uid == request.auth.uid
+                        && resource.data.status == 'pending'
+                        && request.resource.data.status == 'cancelled');
+    }
+
+    // Historical log of paid-out bonuses. Admin/finance only.
+    match /sotw_payouts/{id} {
+      allow read: if isAdmin() || isFinance();
+      allow create: if isAdmin();
+    }
+  }
+}
