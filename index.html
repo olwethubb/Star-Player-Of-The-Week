@@ -417,6 +417,11 @@ function initApp(){
     return { week, year: d.getUTCFullYear() };
   }
   function getWeekLabel(){
+    // TESTING — an admin can override which week it "is" (see setWeekOverride).
+    // Remove this check whenever you remove that control.
+    if (state.settings && state.settings.weekNumberOverride){
+      return `WEEK ${state.settings.weekNumberOverride} · TEST`;
+    }
     const { week, year } = isoWeek();
     return `WEEK ${week} · ${year}`;
   }
@@ -816,6 +821,7 @@ function initApp(){
   let rollingWeek = false;
   function maybeRollWeek(){
     if (!state.loadedProfiles || !state.loadedSettings || rollingWeek) return;
+    if (state.settings.weekNumberOverride) return; // TESTING — manual week override active, see setWeekOverride
     const me = state.profiles[state.user.uid];
     if (!isAdmin(me)) return;
     const key = getWeekKey();
@@ -833,6 +839,53 @@ function initApp(){
       }, { merge:true });
     }).catch(err=>console.warn('Automatic week rollover failed:', err.message))
       .finally(()=>{ rollingWeek = false; });
+  }
+
+  // TESTING — lets an admin pick which week it "is" instead of waiting on the real
+  // calendar, so the whole weekly cycle can be exercised on demand. Clears out the
+  // previous round exactly like a real rollover, opens voting immediately (so members
+  // see the new week and can vote right away), and suspends maybeRollWeek() while
+  // active. Delete setWeekOverride/clearWeekOverride, their UI, and the checks in
+  // getWeekLabel()/maybeRollWeek() once you're back to normal.
+  function setWeekOverride(weekNum){
+    const n = Math.floor(Number(weekNum));
+    if (!n || n < 1 || n > 53){ alert('Enter a week number between 1 and 53.'); return; }
+    const batch = db.batch();
+    Object.keys(state.profiles).forEach(uid => { batch.delete(myvoteCol.doc(uid)); });
+    tallyCol.get().then(tallySnap => {
+      tallySnap.forEach(doc => batch.delete(doc.ref));
+      return batch.commit();
+    }).then(()=>{
+      return settingsRef.set({
+        revealed:false, revealing:false, bonusAwardedUids:[], winnerUids:[], totalVotes:0,
+        votingOpen:true, weekNumberOverride:n
+      }, { merge:true });
+    }).catch(err=>alert(friendlyError(err, 'Could not set the week. Try again in a moment.')));
+  }
+  function clearWeekOverride(){
+    settingsRef.set({ weekNumberOverride: firebase.firestore.FieldValue.delete() }, { merge:true })
+      .catch(err=>alert(friendlyError(err, 'Could not clear the override. Try again in a moment.')));
+  }
+  function weekOverrideControlHTML(){
+    const current = state.settings.weekNumberOverride;
+    return `
+      <div class="balance-card" style="border-color:var(--accent);">
+        <div class="balance-card-top"><span class="balance-label">Testing — set the active week</span></div>
+        <p class="form-hint" style="margin:0 0 10px;">Overrides the real calendar week, clears any votes from the last round, and opens voting immediately for everyone.</p>
+        <div class="cashout-form">
+          <input type="number" id="week-override-input" min="1" max="53" placeholder="Week #" value="${current||''}">
+          <button class="ghost-btn" id="set-week-btn">Set week</button>
+        </div>
+        ${current ? `<button class="small-btn" id="clear-week-btn" style="margin-top:10px;">Clear override</button>` : ''}
+      </div>`;
+  }
+  function bindWeekOverrideControl(){
+    const setBtn = document.getElementById('set-week-btn');
+    if (setBtn) setBtn.addEventListener('click', () => {
+      setWeekOverride(document.getElementById('week-override-input').value);
+    });
+    const clearBtn = document.getElementById('clear-week-btn');
+    if (clearBtn) clearBtn.addEventListener('click', clearWeekOverride);
   }
 
   // Only an admin/owner may open or close the voting window. While closed, nobody —
@@ -1405,6 +1458,7 @@ function initApp(){
          </div>`);
 
     appEl.innerHTML = header(me) + `
+      ${admin ? weekOverrideControlHTML() : ''}
       <h1>Star Worker of the Week</h1>
       <p class="subhead">Vote for the teammate who went above and beyond this week. The winner receives B$${BONUS_AMOUNT}. Results stay hidden until an admin reveals them.</p>
 
@@ -1418,6 +1472,7 @@ function initApp(){
     `;
 
     document.getElementById('logout-btn').addEventListener('click', logout);
+    if (admin) bindWeekOverrideControl();
     appEl.querySelectorAll('[data-vote]').forEach(btn => btn.addEventListener('click', () => castVote(btn.dataset.vote)));
     const startBtn = document.getElementById('start-voting-btn');
     if (startBtn) startBtn.addEventListener('click', startVoting);
@@ -1498,16 +1553,18 @@ function initApp(){
     ` : '';
 
     appEl.innerHTML = header(me) + `
+      ${admin ? weekOverrideControlHTML() : ''}
       <p class="eyebrow">Results</p>
       <h1>${total} vote${total===1?'':'s'} cast this week</h1>
       ${winnerBlock}
       ${scoreboardHTML}
-      ${admin ? `<p class="form-hint" style="margin-bottom:20px;">Next week opens automatically once the calendar week changes — nothing to click.</p>` : ''}
+      ${admin ? `<p class="form-hint" style="margin-bottom:20px;">Next week opens automatically once the calendar week changes, or set one above to start testing right away.</p>` : ''}
       ${financeAccess ? payoutQueueHTML() : ''}
       ${admin ? manageTeamHTML() : ''}
     `;
 
     document.getElementById('logout-btn').addEventListener('click', logout);
+    if (admin) bindWeekOverrideControl();
     appEl.querySelectorAll('[data-award]').forEach(btn => btn.addEventListener('click', () => awardBonus(btn.dataset.award)));
     if (financeAccess) bindPayoutQueue();
     if (admin) bindManageTeam();
