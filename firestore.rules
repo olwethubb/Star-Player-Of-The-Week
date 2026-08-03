@@ -33,40 +33,43 @@ service cloud.firestore {
       return signedIn()
         && get(/databases/$(database)/documents/sotw_meta/settings).data.financeUid == request.auth.uid;
     }
-    function isRealAccount() {
-      // true for email/password accounts; false for the anonymous sessions used to vote without logging in
-      return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    // Only true while an admin has explicitly opened this week's voting window
+    // (the "Start Voting" / "End Voting" buttons). Nobody can cast a vote
+    // outside that window — this is enforced here, not just in the UI.
+    function votingIsOpen() {
+      return get(/databases/$(database)/documents/sotw_meta/settings).data.votingOpen == true;
     }
 
-    // Team roster — everyone signed in (including anonymous voters) needs to read
-    // this to see names on the vote screen. Only an owner/admin can create, edit,
-    // or remove a profile.
+    // Team roster — everyone signed in needs to read this to see names on the
+    // vote screen. Only an owner/admin can create, edit, or remove a profile.
     match /sotw_profiles/{uid} {
       allow read: if signedIn();
       allow write: if isAdmin();
     }
 
-    // Each real logged-in account's own vote. Nobody else — not even admins — can
-    // ever read another person's pick.
+    // Each account's own vote. Nobody else — not even admins — can ever read
+    // another person's pick. A vote can only be cast/changed while an admin
+    // has voting open, must be for a real teammate, and can never be for
+    // yourself. Admins may delete any vote doc (used when removing a
+    // teammate or resetting for a new week); everyone may delete their own.
     match /sotw_myvote/{uid} {
-      allow read, write: if signedIn() && request.auth.uid == uid;
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
+                            && votingIsOpen()
+                            && request.resource.data.votedForUid != uid
+                            && profileExists(request.resource.data.votedForUid);
+      allow delete: if signedIn() && (request.auth.uid == uid || isAdmin());
     }
 
-    // Votes cast without logging in. There's no password to check identity against,
-    // so — by design — any signed-in (including anonymous) session may read/write
-    // any doc here; the app itself only ever writes to the doc matching whichever
-    // name the visitor picked. This is the deliberate trade-off of dropping the
-    // login requirement for voting: convenience over strict per-person enforcement.
-    match /sotw_anon_myvote/{uid} {
-      allow read, write: if signedIn() && profileExists(uid);
-    }
-
-    // Anonymous running vote counts. Anyone signed in (real or anonymous) can nudge
-    // a count when casting a vote, but only admins can ever read the breakdown —
-    // and only the app's own logic decides when (after reveal).
+    // Anonymous running vote counts. Any signed-in account may nudge a count
+    // while voting is open (as part of casting their own vote), but only
+    // admins can ever read the breakdown, and only admins may clear it
+    // (weekly reset) — everyone else only ever learns the eventual winner
+    // via settings.winnerUids, which never exposes per-person data.
     match /sotw_tally/{uid} {
       allow read: if isAdmin();
-      allow write: if signedIn();
+      allow create, update: if signedIn() && votingIsOpen();
+      allow delete: if isAdmin();
     }
 
     match /sotw_meta/{doc} {
@@ -74,12 +77,11 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // Cash-out requests. Only real accounts may request one for themselves; the
-    // requester can read/cancel their own, admins and the assigned finance holder
-    // can read/approve/reject any.
+    // Cash-out requests. The requester can read/cancel their own, admins and
+    // the assigned finance holder can read/approve/reject any.
     match /sotw_payout_requests/{id} {
       allow read: if isAdmin() || isFinance() || (signedIn() && resource.data.uid == request.auth.uid);
-      allow create: if isRealAccount() && request.resource.data.uid == request.auth.uid
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid
                     && request.resource.data.status == 'pending';
       allow update: if isAdmin() || isFinance()
                     || (signedIn() && resource.data.uid == request.auth.uid

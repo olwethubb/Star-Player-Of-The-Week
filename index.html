@@ -1,5 +1,6 @@
 <!-- Blacfox — Star Worker of the Week -->
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- Google Fonts: if Landingi lets you place custom code in the page <head>, put this line there for slightly faster loading. Otherwise it's fine to leave it right here. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -62,7 +63,7 @@ h1{ font-family:Georgia,'Iowan Old Style','Times New Roman',serif; font-style:it
 .icon{ display:inline-flex; flex-shrink:0; }
 
 /* ---- Logo (same size everywhere) ---- */
-.logo{ height:52px; width:auto; display:block; }
+.logo{ height:133px; width:auto; display:block; }
 
 /* ---- Burst accent — the logo's own bomb-sprouting-a-plant illustration,
    reused wherever the app wants a "moment": the pre-login gate and the
@@ -247,9 +248,9 @@ details.manage[open] summary:after{content:'\2212';}
    ONE-TIME SETUP (~10 minutes):
    1. console.firebase.google.com → create a free project.
    2. Build → Firestore Database → Create database (any region).
-   3. Build → Authentication → Sign-in method → enable "Email/Password" AND
-      "Anonymous" (Anonymous is what lets people vote without an account —
-      staff logins still use Email/Password).
+   3. Build → Authentication → Sign-in method → enable "Email/Password".
+      (If "Anonymous" is enabled from an earlier version of this app, turn
+      it off here too — voting now always requires a real account.)
    4. Project settings (gear icon) → General → "Your apps" → web icon </>
       → register app → copy the firebaseConfig object shown.
    5. Paste it into FIREBASE_CONFIG below, replacing the placeholders.
@@ -315,16 +316,14 @@ function initApp(){
   const db = firebase.firestore();
   const profilesCol = db.collection('sotw_profiles');
   const myvoteCol = db.collection('sotw_myvote'); // each real logged-in account's own vote — nobody else can ever read these
-  const anonMyvoteCol = db.collection('sotw_anon_myvote'); // votes cast without logging in, keyed by the profile the voter picked
   const tallyCol = db.collection('sotw_tally');   // anonymous running counts — admin-only, and only once revealed
   const payoutCol = db.collection('sotw_payout_requests'); // cash-out requests
   const settingsRef = db.collection('sotw_meta').doc('settings');
-  const ANON_SELF_KEY = 'blacfox_sotw_anon_self';
 
   const state = {
     user: null,
     profiles: {},      // uid -> {name,email,role,balance}
-    settings: { revealed:false, bonusAwardedUids:[], winnerUids:[], totalVotes:0, financeUid:null },
+    settings: { revealed:false, bonusAwardedUids:[], winnerUids:[], totalVotes:0, financeUid:null, votingOpen:false },
     myVote: null,      // my own votedForUid, or null
     tally: {},         // uid -> count — only ever populated for admins, only after reveal
     payoutQueue: [],       // all requests — only populated for finance/admin
@@ -334,12 +333,11 @@ function initApp(){
     payoutQueueUnsub: null,
     myPayoutUnsub: null,
     loadedProfiles:false, loadedSettings:false, loadedMyVote:false, loadedTally:false,
-    loadErrorMsg: null,
-    anonVoteUnsub: null, anonVoteSubUid: undefined, anonVoteLoaded:false, anonVote:null
+    loadErrorMsg: null
   };
   let uiRevealing = false;
   let lastRevealedState = false;
-  let gateShowLogin = false; // toggles the logged-out landing screen between "Vote now" and the staff login form
+  let gateShowLogin = false; // toggles the logged-out landing screen between the "Vote Now" hero and the sign-in form
 
   function esc(s){
     const d = document.createElement('div');
@@ -412,47 +410,10 @@ function initApp(){
     if (state.myPayoutUnsub){ try{ state.myPayoutUnsub(); }catch(e){} state.myPayoutUnsub=null; }
     state.payoutQueue = []; state.myPayout = null;
   }
-  function clearAnonVoteSub(){
-    if (state.anonVoteUnsub){ try{ state.anonVoteUnsub(); }catch(e){} state.anonVoteUnsub=null; }
-    state.anonVoteSubUid = undefined; state.anonVoteLoaded = false; state.anonVote = null;
-  }
-
-  // A visitor voting without logging in has no profile of their own — the tally/payout
-  // collections are locked to real accounts, so skip subscribing (avoids spurious
-  // permission-denied noise) and just let them vote.
-  function ensureAnonVoteSub(selfUid){
-    if (state.anonVoteSubUid === selfUid) return;
-    if (state.anonVoteUnsub){ try{ state.anonVoteUnsub(); }catch(e){} state.anonVoteUnsub=null; }
-    state.anonVoteSubUid = selfUid;
-    state.anonVoteLoaded = false;
-    state.anonVote = null;
-    if (!selfUid) return;
-    state.anonVoteUnsub = anonMyvoteCol.doc(selfUid).onSnapshot(snap=>{
-      state.anonVote = snap.exists ? snap.data().votedForUid : null;
-      state.anonVoteLoaded = true;
-      render();
-    }, handleErr);
-  }
-
-  // Casting an anonymous vote never reads anyone's vote — old and new tally docs are nudged
-  // with an atomic increment/decrement, same pattern as the logged-in castVote() below.
-  function castAnonVote(selfUid, forUid){
-    const myRef = anonMyvoteCol.doc(selfUid);
-    db.runTransaction(tx => tx.get(myRef).then(snap => {
-      const prev = snap.exists ? snap.data().votedForUid : null;
-      if (prev === forUid) return;
-      tx.set(tallyCol.doc(forUid), { count: firebase.firestore.FieldValue.increment(1) }, { merge:true });
-      if (prev){
-        tx.set(tallyCol.doc(prev), { count: firebase.firestore.FieldValue.increment(-1) }, { merge:true });
-      }
-      tx.set(myRef, { votedForUid: forUid, ts: firebase.firestore.FieldValue.serverTimestamp() });
-    })).catch(err=>alert(err.message));
-  }
-
   // Only admins ever subscribe to the tally, and only once revealed — everyone else
   // just reads settings.winnerUids / settings.totalVotes, which never expose per-person data.
   function maybeManageTally(){
-    if (!state.loadedProfiles || !state.loadedSettings || state.user.isAnonymous) return;
+    if (!state.loadedProfiles || !state.loadedSettings) return;
     const me = state.profiles[state.user.uid];
     const shouldSubscribe = state.settings.revealed && isAdmin(me);
     if (shouldSubscribe && !state.tallyUnsub){
@@ -469,7 +430,7 @@ function initApp(){
   // Only the assigned finance person (or an admin) ever sees the full payout queue.
   // Everyone tracks just their own latest request separately.
   function maybeManagePayouts(){
-    if (!state.loadedProfiles || !state.loadedSettings || state.user.isAnonymous) return;
+    if (!state.loadedProfiles || !state.loadedSettings) return;
     const me = state.profiles[state.user.uid];
     const canManage = canManagePayouts(me, state.user.uid);
     if (canManage && !state.payoutQueueUnsub){
@@ -500,7 +461,6 @@ function initApp(){
     clearSubs();
     clearTallySub();
     clearPayoutSubs();
-    clearAnonVoteSub();
     if (user){
       state.loadedProfiles=false; state.loadedSettings=false; state.loadedMyVote=false;
       state.loadErrorMsg = null;
@@ -511,7 +471,7 @@ function initApp(){
         maybeManageTally(); maybeManagePayouts(); render();
       }, handleErr);
       const u2 = settingsRef.onSnapshot(snap=>{
-        state.settings = snap.data() || { revealed:false, bonusAwardedUids:[], winnerUids:[], totalVotes:0, financeUid:null };
+        state.settings = snap.data() || { revealed:false, bonusAwardedUids:[], winnerUids:[], totalVotes:0, financeUid:null, votingOpen:false };
         state.loadedSettings=true;
         maybeManageTally(); maybeManagePayouts(); render();
       }, handleErr);
@@ -527,12 +487,17 @@ function initApp(){
 
   function login(email,password){ return auth.signInWithEmailAndPassword(email,password); }
   function logout(){ auth.signOut(); }
-  function startVotingWithoutLogin(){ return auth.signInAnonymously(); }
   function forgotPassword(email){
     if(!email){ alert('Enter your email above first, then click "Forgot password?" again.'); return; }
     auth.sendPasswordResetEmail(email)
       .then(()=>alert('Check your email for a password reset link.'))
-      .catch(err=>alert(err.message));
+      .catch(err=>{
+        const map = {
+          'auth/invalid-email':'That email address looks invalid.',
+          'auth/user-not-found':'Check your email for a password reset link.' // don't reveal whether the account exists
+        };
+        alert(map[err.code] || err.message);
+      });
   }
 
   // ---------------- Admin actions ----------------
@@ -617,6 +582,7 @@ function initApp(){
   // Casting a vote never reads anyone's vote — old and new tally docs are nudged with an
   // atomic increment/decrement, so the only read in this transaction is your own vote record.
   function castVote(forUid){
+    if (!state.settings.votingOpen || forUid === state.user.uid) return;
     const myVoteRef = myvoteCol.doc(state.user.uid);
     db.runTransaction(tx => {
       return tx.get(myVoteRef).then(myVoteSnap => {
@@ -674,6 +640,7 @@ function initApp(){
   }
 
   function onRevealClick(){
+    if (state.settings.votingOpen) return; // end the session before revealing
     uiRevealing = true;
     render();
     setTimeout(()=>{ uiRevealing = false; doReveal(); }, 1100);
@@ -694,13 +661,22 @@ function initApp(){
 
   function startNewWeek(){
     const batch = db.batch();
-    Object.keys(state.profiles).forEach(uid => { batch.delete(myvoteCol.doc(uid)); batch.delete(anonMyvoteCol.doc(uid)); });
+    Object.keys(state.profiles).forEach(uid => { batch.delete(myvoteCol.doc(uid)); });
     tallyCol.get().then(tallySnap => {
       tallySnap.forEach(doc => batch.delete(doc.ref));
       return batch.commit();
     }).then(()=>{
-      settingsRef.set({ revealed:false, bonusAwardedUids:[], winnerUids:[], totalVotes:0 }, { merge:true });
+      settingsRef.set({ revealed:false, bonusAwardedUids:[], winnerUids:[], totalVotes:0, votingOpen:false }, { merge:true });
     }).catch(err=>alert('Could not start new week: ' + err.message));
+  }
+
+  // Only an admin/owner may open or close the voting window. While closed, nobody —
+  // including admins — can cast a vote; enforced both here and in firestore.rules.
+  function startVoting(){
+    settingsRef.set({ votingOpen:true }, { merge:true }).catch(err=>alert(err.message));
+  }
+  function endVoting(){
+    settingsRef.set({ votingOpen:false }, { merge:true }).catch(err=>alert(err.message));
   }
 
   // ---------------- Render ----------------
@@ -711,8 +687,6 @@ function initApp(){
       return;
     }
     if (uiRevealing){ renderTallying(); return; }
-
-    if (state.user.isAnonymous){ renderAnonVote(); return; }
 
     const me = state.profiles[state.user.uid];
     if (!me){ renderNoAccess(); return; }
@@ -748,17 +722,13 @@ function initApp(){
           ${brandLogo()}
           <p class="gate-eyebrow">${getWeekLabel()}</p>
           <h1>Star Worker of the Week</h1>
-          <p class="gate-body">Cast one vote for a teammate. The winner takes home B$${BONUS_AMOUNT} in Blacfox Dollars.</p>
+          <p class="gate-body">Vote for the teammate who went above and beyond this week. The winner takes home B$${BONUS_AMOUNT} in Blacfox Dollars.</p>
           <div class="gate-actions">
-            <button class="gate-btn primary" id="gate-vote-btn">Vote now</button>
-            <button class="gate-btn ghost" id="gate-login-btn">Log in to check balance</button>
+            <button class="gate-btn primary" id="gate-vote-btn">Vote Now</button>
           </div>
         </div>
       </div>`;
     document.getElementById('gate-vote-btn').addEventListener('click', () => {
-      startVotingWithoutLogin().catch(err => alert(err.message));
-    });
-    document.getElementById('gate-login-btn').addEventListener('click', () => {
       gateShowLogin = true; render();
     });
   }
@@ -769,7 +739,7 @@ function initApp(){
         <div class="gate-inner">
           ${brandLogo()}
           <h1>Sign in</h1>
-          <p class="gate-body" style="margin-bottom:24px;">Enter your email and password to continue.</p>
+          <p class="gate-body" style="margin-bottom:24px;">Enter your email and password to vote.</p>
           <div class="login-error" id="login-error"></div>
           <form id="login-form">
             <div class="field">
@@ -788,7 +758,7 @@ function initApp(){
             <button type="submit" class="gate-btn primary">Log in</button>
           </form>
           <button class="forgot-link" id="forgot-btn">Forgot password?</button>
-          <button class="forgot-link" id="gate-back-btn">‹ Back to voting</button>
+          <button class="forgot-link" id="gate-back-btn">‹ Back</button>
         </div>
       </div>`;
 
@@ -808,107 +778,19 @@ function initApp(){
       const pw = document.getElementById('login-pw').value;
       const errEl = document.getElementById('login-error');
       errEl.textContent = '';
+      if (!email || !pw){ errEl.textContent = 'Enter both your email and password.'; return; }
       login(email, pw).catch(err => {
         const map = {
           'auth/wrong-password':'Incorrect email or password.',
           'auth/user-not-found':'Incorrect email or password.',
+          'auth/invalid-credential':'Incorrect email or password.',
           'auth/invalid-email':'That email address looks invalid.',
+          'auth/user-disabled':'This account has been disabled. Ask an admin.',
           'auth/too-many-requests':'Too many attempts — wait a bit and try again.'
         };
         errEl.textContent = map[err.code] || err.message;
       });
     });
-  }
-
-  function renderAnonVote(){
-    const storedUid = localStorage.getItem(ANON_SELF_KEY);
-    const selfUid = (storedUid && state.profiles[storedUid]) ? storedUid : null;
-    ensureAnonVoteSub(selfUid);
-
-    if (state.settings.revealed){
-      appEl.innerHTML = `
-        <div class="gate burst">
-          <div class="gate-inner">
-            ${brandLogo()}
-            <h1>Results are in</h1>
-            <p class="gate-body">This week's Star Worker has already been revealed. Log in to check your Blacfox Dollar balance.</p>
-            <div class="gate-actions">
-              <button class="gate-btn ghost" id="anon-login-btn">Log in</button>
-            </div>
-          </div>
-        </div>`;
-      document.getElementById('anon-login-btn').addEventListener('click', () => { gateShowLogin = true; logout(); });
-      return;
-    }
-
-    if (!selfUid){
-      const rows = Object.entries(state.profiles)
-        .sort((a,b)=>a[1].name.localeCompare(b[1].name))
-        .map(([uid,p]) => `
-          <button class="vote-card" data-pick="${uid}" style="cursor:pointer;text-align:left;width:100%;">
-            <div class="avatar">${initials(p.name)}</div>
-            <div class="name">${esc(p.name)}</div>
-          </button>`).join('');
-      appEl.innerHTML = `
-        <div class="topbar">
-          <div class="brand">${brandLogo()}</div>
-          <span class="week-label">${getWeekLabel()}</span>
-        </div>
-        <h1>Who are you?</h1>
-        <p class="subhead">Pick your name to vote for a teammate. No password needed.</p>
-        <div class="vote-grid">${rows || '<div class="empty-state">No teammates set up yet.</div>'}</div>
-        <button class="ghost-btn full-btn" id="anon-login-btn2" style="margin-top:8px;">Log in instead</button>
-      `;
-      appEl.querySelectorAll('[data-pick]').forEach(btn => btn.addEventListener('click', () => {
-        localStorage.setItem(ANON_SELF_KEY, btn.dataset.pick); render();
-      }));
-      document.getElementById('anon-login-btn2').addEventListener('click', () => { gateShowLogin = true; logout(); });
-      return;
-    }
-
-    if (!state.anonVoteLoaded){
-      appEl.innerHTML = `<div class="loading"><div class="spinner"></div><div class="loading-text">Loading</div></div>`;
-      return;
-    }
-
-    const me = state.profiles[selfUid];
-    const others = Object.entries(state.profiles).filter(([uid]) => uid !== selfUid);
-    const myVote = state.anonVote;
-
-    appEl.innerHTML = `
-      <div class="topbar">
-        <div class="brand">${brandLogo()}</div>
-        <span class="week-label">${getWeekLabel()}</span>
-      </div>
-      <div class="who-row">
-        <span class="whoname">Voting as ${esc(me.name)}</span>
-        <button class="logout-link" id="anon-switch-btn">Not you?</button>
-      </div>
-      <h1>Star Worker of the Week</h1>
-      <p class="subhead">Vote for the teammate who went above and beyond this week. The winner receives B$${BONUS_AMOUNT}. Results stay hidden until an admin reveals them.</p>
-
-      ${others.length === 0 ? `
-        <div class="empty-state">No other teammates yet.</div>
-      ` : `
-        <div class="vote-grid">
-          ${others.map(([uid,p]) => `
-            <div class="vote-card ${myVote===uid ? 'selected' : ''}">
-              <div class="avatar">${initials(p.name)}</div>
-              <div class="name">${esc(p.name)}</div>
-              <button class="vote-btn ${myVote===uid ? 'voted' : ''}" data-vote="${uid}">${myVote===uid ? ICON_CHECK + ' Voted' : 'Vote'}</button>
-            </div>
-          `).join('')}
-        </div>
-        <div class="lock-note">${ICON_LOCK}<span>${myVote ? "Your vote is locked in." : "You haven't voted yet."} Only admins can reveal the results, and only once they choose to.</span></div>
-      `}
-
-      <button class="ghost-btn full-btn" id="anon-login-btn3">Log in to check your balance / cash out</button>
-    `;
-    document.getElementById('anon-switch-btn').addEventListener('click', () => {
-      localStorage.removeItem(ANON_SELF_KEY); render();
-    });
-    appEl.querySelectorAll('[data-vote]').forEach(btn => btn.addEventListener('click', () => castAnonVote(selfUid, btn.dataset.vote)));
-    document.getElementById('anon-login-btn3').addEventListener('click', () => { gateShowLogin = true; logout(); });
   }
 
   function renderNoAccess(){
@@ -1070,6 +952,7 @@ function initApp(){
   }
 
   function renderMain(me){
+    const votingOpen = !!state.settings.votingOpen;
     const others = Object.entries(state.profiles).filter(([uid]) => uid !== state.user.uid);
     const myVote = state.myVote;
     const admin = isAdmin(me);
@@ -1094,15 +977,13 @@ function initApp(){
       cashoutHTML = '';
     }
 
-    appEl.innerHTML = header(me) + `
-      <h1>Star Worker of the Week</h1>
-      <p class="subhead">Vote for the teammate who went above and beyond this week. The winner receives B$${BONUS_AMOUNT}. Results stay hidden until an admin reveals them.</p>
-
-      ${cashoutHTML}
-
-      ${others.length === 0 ? `
-        <div class="empty-state">Add more teammates below before voting can start.</div>
-      ` : `
+    let votingSectionHTML;
+    if (!votingOpen){
+      votingSectionHTML = `<div class="empty-state">Voting hasn't opened yet this week.${admin ? ' Click "Start Voting" below when you\'re ready.' : ' Check back once an admin opens it.'}</div>`;
+    } else if (others.length === 0){
+      votingSectionHTML = `<div class="empty-state">Add more teammates below before voting can start.</div>`;
+    } else {
+      votingSectionHTML = `
         <div class="vote-grid">
           ${others.map(([uid,p]) => `
             <div class="vote-card ${myVote===uid ? 'selected' : ''}">
@@ -1113,15 +994,40 @@ function initApp(){
           `).join('')}
         </div>
         <div class="lock-note">${ICON_LOCK}<span>${myVote ? "Your vote is locked in." : "You haven't voted yet."} Only admins can reveal the results, and only once they choose to.</span></div>
-      `}
+      `;
+    }
 
-      ${admin ? `<button class="primary-btn" id="reveal-btn">Reveal Results</button>` : ''}
+    // Only an admin can open/close the voting window or trigger a reveal — and reveal is
+    // only offered once voting is closed, so results can't be tallied while votes are
+    // still trickling in.
+    const sessionHTML = !admin ? '' : (votingOpen
+      ? `<button class="primary-btn" id="end-voting-btn">End Voting</button>`
+      : `<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+           <button class="ghost-btn full-btn" id="start-voting-btn">Start Voting</button>
+           <button class="primary-btn" id="reveal-btn" style="margin-bottom:0;">Reveal Results</button>
+         </div>`);
+
+    appEl.innerHTML = header(me) + `
+      <h1>Star Worker of the Week</h1>
+      <p class="subhead">Vote for the teammate who went above and beyond this week. The winner receives B$${BONUS_AMOUNT}. Results stay hidden until an admin reveals them.</p>
+
+      ${cashoutHTML}
+
+      ${votingSectionHTML}
+
+      ${sessionHTML}
       ${financeAccess ? payoutQueueHTML() : ''}
       ${admin ? manageTeamHTML() : ''}
     `;
 
     document.getElementById('logout-btn').addEventListener('click', logout);
     appEl.querySelectorAll('[data-vote]').forEach(btn => btn.addEventListener('click', () => castVote(btn.dataset.vote)));
+    const startBtn = document.getElementById('start-voting-btn');
+    if (startBtn) startBtn.addEventListener('click', startVoting);
+    const endBtn = document.getElementById('end-voting-btn');
+    if (endBtn) endBtn.addEventListener('click', () => {
+      if (confirm("End voting now? Nobody will be able to vote again until you start a new session.")) endVoting();
+    });
     const revealBtn = document.getElementById('reveal-btn');
     if (revealBtn) revealBtn.addEventListener('click', onRevealClick);
     const cashoutBtn = document.getElementById('cashout-btn');
