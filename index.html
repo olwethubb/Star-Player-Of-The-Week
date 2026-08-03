@@ -744,8 +744,17 @@ function initApp(){
         const tally = {};
         tallySnap.forEach(d => tally[d.id] = d.data().count || 0);
         Object.keys(state.profiles).forEach(uid => { if (!(uid in tally)) tally[uid] = 0; });
-        const entries = Object.entries(tally);
-        const total = entries.reduce((a,[,c])=>a+c,0);
+        let entries = Object.entries(tally);
+        let total = entries.reduce((a,[,c])=>a+c,0);
+        // TESTING CONVENIENCE — delete this block once you're voting for real: with
+        // zero actual votes there's nobody to reveal, so fake a single vote for a
+        // random teammate. Everything downstream (the wheel, the popup, the speech,
+        // the full results page, the bonus) then runs exactly like a real 1-vote win.
+        if (total === 0 && entries.length > 0){
+          const idx = Math.floor(Math.random() * entries.length);
+          entries = entries.map((e,i) => i===idx ? [e[0], 1] : e);
+          total = 1;
+        }
         const top = total > 0 ? Math.max(...entries.map(([,c])=>c)) : 0;
         const winnerUids = total > 0 ? entries.filter(([,c])=>c===top).map(([uid])=>uid) : [];
         return settingsRef.set({ revealed:true, revealing:false, winnerUids, totalVotes: total }, { merge:true }).then(() => {
