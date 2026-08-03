@@ -42,9 +42,19 @@ service cloud.firestore {
 
     // Team roster — everyone signed in needs to read this to see names on the
     // vote screen. Only an owner/admin can create, edit, or remove a profile.
+    // Deliberately has no balance field — see sotw_balances below.
     match /sotw_profiles/{uid} {
       allow read: if signedIn();
       allow write: if isAdmin();
+    }
+
+    // Blacfox Dollar balances — split out from sotw_profiles specifically so a
+    // normal member can never read anyone else's balance (profiles must stay
+    // broadly readable for names on the vote screen; balances must not be).
+    // Finance can write too since approving a cash-out deducts here directly.
+    match /sotw_balances/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin() || isFinance());
+      allow write: if isAdmin() || isFinance();
     }
 
     // Each account's own vote. Nobody else — not even admins — can ever read
@@ -85,7 +95,7 @@ service cloud.firestore {
                     && request.resource.data.status == 'pending'
                     && request.resource.data.amount is number
                     && request.resource.data.amount > 0
-                    && request.resource.data.amount <= get(/databases/$(database)/documents/sotw_profiles/$(request.auth.uid)).data.balance;
+                    && request.resource.data.amount <= get(/databases/$(database)/documents/sotw_balances/$(request.auth.uid)).data.balance;
       allow update: if isAdmin() || isFinance()
                     || (signedIn() && resource.data.uid == request.auth.uid
                         && resource.data.status == 'pending'
