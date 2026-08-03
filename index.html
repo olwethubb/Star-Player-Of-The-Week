@@ -393,6 +393,7 @@ function initApp(){
   let ceremonyPhase = null;    // 'spinning' | 'landed' | null
   let wheelPhaseRendered = null; // guards against rebuilding the wheel's DOM (and restarting its CSS spin) on unrelated re-renders
   let lastRevealedState = false;
+  let firstSettingsSnapshot = true; // so opening the app *after* a reveal just shows the results — the ceremony only plays for people watching live when it happens
   const REVEAL_SPIN_MS = 5000;      // how long the wheel spins for, per your "5 seconds" spec
   const REVEAL_POPUP_HOLD_MS = 2600; // how long the landed wheel + winner popup stay up before the full results page
   let gateMode = 'gate'; // 'gate' | 'login' | 'signup' — which logged-out screen is showing
@@ -562,6 +563,7 @@ function initApp(){
     if (user){
       state.loadedProfiles=false; state.loadedSettings=false; state.loadedMyVote=false; state.loadedMyBalance=false;
       state.loadErrorMsg = null;
+      firstSettingsSnapshot = true;
       render();
       const u1 = profilesCol.onSnapshot(snap=>{
         const p={}; snap.forEach(d=>p[d.id]=d.data()); state.profiles=p; state.loadedProfiles=true;
@@ -571,6 +573,14 @@ function initApp(){
       const u2 = settingsRef.onSnapshot(snap=>{
         state.settings = snap.data() || { revealed:false, bonusAwardedUids:[], winnerUids:[], totalVotes:0, financeUid:null, votingOpen:false };
         state.loadedSettings=true;
+        if (firstSettingsSnapshot){
+          firstSettingsSnapshot = false;
+          // Whatever "revealed" already is right now is not a fresh reveal happening
+          // live — it's just the state of the world as we walk in. Mark it as already
+          // seen so render() won't mistake it for a false→true transition and replay
+          // the ceremony for something that happened before we ever opened the app.
+          lastRevealedState = !!state.settings.revealed;
+        }
         maybeManageTally(); maybeManageBalances(); maybeManagePayouts(); maybeRollWeek(); render();
       }, handleErr);
       const u3 = myvoteCol.doc(user.uid).onSnapshot(snap=>{
