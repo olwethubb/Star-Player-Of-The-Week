@@ -41,11 +41,20 @@ service cloud.firestore {
     }
 
     // Team roster — everyone signed in needs to read this to see names on the
-    // vote screen. Only an owner/admin can create, edit, or remove a profile.
-    // Deliberately has no balance field — see sotw_balances below.
+    // vote screen. Admins can create/edit/remove anyone. Someone can also create
+    // their OWN profile once, for self-signup — but only as role:'member' with a
+    // company email matching their actual account, so nobody can self-promote to
+    // admin/owner or claim someone else's email. Editing or removing still
+    // requires an admin either way. Deliberately has no balance field — see
+    // sotw_balances below.
     match /sotw_profiles/{uid} {
       allow read: if signedIn();
-      allow write: if isAdmin();
+      allow create: if isAdmin()
+                    || (signedIn() && request.auth.uid == uid
+                        && request.resource.data.role == 'member'
+                        && request.resource.data.email == request.auth.token.email
+                        && request.resource.data.email.matches('.*@blacfox[.]com$'));
+      allow update, delete: if isAdmin();
     }
 
     // Blacfox Dollar balances — split out from sotw_profiles specifically so a
