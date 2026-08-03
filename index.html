@@ -203,10 +203,17 @@ details.manage[open] summary:after{content:'\2212';}
 .gen-btn{ background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:0 12px; cursor:pointer; font-size:13px; white-space:nowrap; }
 .form-hint{ font-size:12px; color:var(--text-muted); margin-top:-2px; }
 
-/* ---- Tallying / reveal ---- */
-.tallying{ display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:100px 20px; gap:18px; }
+/* ---- Reveal ---- */
 .spinner{ width:30px; height:30px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
-.tallying p{ font-family:'JetBrains Mono',monospace; font-size:12px; letter-spacing:.05em; color:var(--text-muted); text-transform:uppercase; margin:0; }
+
+/* ---- Drum roll (the synchronized suspense beat before every reveal) ---- */
+@keyframes drumShake{ 0%,100%{ transform:rotate(0deg); } 20%{ transform:rotate(-8deg); } 40%{ transform:rotate(6deg); } 60%{ transform:rotate(-5deg); } 80%{ transform:rotate(4deg); } }
+@keyframes pulseFade{ 0%,100%{ opacity:1; } 50%{ opacity:.4; } }
+.drumroll .gate-inner{ align-items:center; text-align:center; max-width:none; }
+.drumroll .trophy-wrap{ margin-bottom:8px; }
+.drumroll .trophy-wrap .icon{ display:inline-block; animation:drumShake .3s ease-in-out infinite; }
+.drumroll .gate-eyebrow{ animation:pulseFade 1s ease-in-out infinite; }
+.drumroll h1{ max-width:20ch; }
 
 .winner-card{ background:var(--bg-card); border:1px solid var(--border); border-radius:20px; padding:34px 22px; text-align:center; margin-bottom:26px; box-shadow:var(--shadow); animation:revealIn .5s cubic-bezier(.16,1,.3,1); }
 .trophy-wrap{ position:relative; display:inline-flex; align-items:center; justify-content:center; width:76px; height:76px; margin-bottom:14px; }
@@ -347,8 +354,9 @@ function initApp(){
     loadedProfiles:false, loadedSettings:false, loadedMyVote:false, loadedMyBalance:false, loadedTally:false, loadedBalances:false,
     loadErrorMsg: null
   };
-  let uiRevealing = false;
+  let ceremonyPending = false; // true from the moment a fresh reveal is seen until the local drum-roll finishes
   let lastRevealedState = false;
+  const REVEAL_CEREMONY_MS = 5000;
   let gateShowLogin = false; // toggles the logged-out landing screen between the "Vote Now" hero and the sign-in form
 
   function esc(s){
@@ -359,14 +367,24 @@ function initApp(){
   function initials(name){
     return (name||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0].toUpperCase()).join('');
   }
-  function getWeekLabel(){
+  function isoWeek(){
     const now = new Date();
     const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
     const dayNum = (d.getUTCDay() + 6) % 7;
     d.setUTCDate(d.getUTCDate() - dayNum + 3);
     const firstThursday = new Date(Date.UTC(d.getUTCFullYear(),0,4));
     const week = 1 + Math.round(((d - firstThursday) / 86400000 - 3 + (firstThursday.getUTCDay()+6)%7) / 7);
-    return `WEEK ${week} · ${d.getUTCFullYear()}`;
+    return { week, year: d.getUTCFullYear() };
+  }
+  function getWeekLabel(){
+    const { week, year } = isoWeek();
+    return `WEEK ${week} · ${year}`;
+  }
+  // A stable key for "which calendar week is it right now" — used only to decide
+  // when the automatic weekly rollover (see maybeRollWeek) should fire.
+  function getWeekKey(){
+    const { week, year } = isoWeek();
+    return `${year}-W${week}`;
   }
   function generatePassword(){
     const chars='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
@@ -501,12 +519,12 @@ function initApp(){
       const u1 = profilesCol.onSnapshot(snap=>{
         const p={}; snap.forEach(d=>p[d.id]=d.data()); state.profiles=p; state.loadedProfiles=true;
         state.loadErrorMsg = null;
-        maybeManageTally(); maybeManageBalances(); maybeManagePayouts(); render();
+        maybeManageTally(); maybeManageBalances(); maybeManagePayouts(); maybeRollWeek(); render();
       }, handleErr);
       const u2 = settingsRef.onSnapshot(snap=>{
         state.settings = snap.data() || { revealed:false, bonusAwardedUids:[], winnerUids:[], totalVotes:0, financeUid:null, votingOpen:false };
         state.loadedSettings=true;
-        maybeManageTally(); maybeManageBalances(); maybeManagePayouts(); render();
+        maybeManageTally(); maybeManageBalances(); maybeManagePayouts(); maybeRollWeek(); render();
       }, handleErr);
       const u3 = myvoteCol.doc(user.uid).onSnapshot(snap=>{
         state.myVote = snap.exists ? snap.data().votedForUid : null;
@@ -641,18 +659,19 @@ function initApp(){
     }).catch(err=>alert(err.message));
   }
 
-  // Reveal happens in two steps: (1) atomically flip revealed so only one admin's click
-  // proceeds even if two click at once, then (2) read the now-unlocked tally, work out the
-  // winner, and store just their name in settings (never the per-person breakdown) so
-  // regular members only ever learn who won, never the numbers.
+  // Reveal happens in two steps: (1) atomically claim a "revealing" lock so only one
+  // admin's click proceeds even if two click at once, then (2) read the now-unlocked
+  // tally, work out the winner, and write it together with revealed:true in ONE write —
+  // so no client can ever observe revealed=true before the winner is actually known.
+  // Everyone's synchronized drum-roll ceremony (see render()) keys off that single write.
   function doReveal(){
     db.runTransaction(tx => tx.get(settingsRef).then(sSnap => {
       const s = sSnap.data() || {};
-      if (s.revealed) return false;
-      tx.set(settingsRef, { revealed:true }, { merge:true });
+      if (s.revealed || s.revealing) return false;
+      tx.set(settingsRef, { revealing:true }, { merge:true });
       return true;
-    })).then(didReveal => {
-      if (!didReveal) return;
+    })).then(claimed => {
+      if (!claimed) return;
       return tallyCol.get().then(tallySnap => {
         const tally = {};
         tallySnap.forEach(d => tally[d.id] = d.data().count || 0);
@@ -661,7 +680,7 @@ function initApp(){
         const total = entries.reduce((a,[,c])=>a+c,0);
         const top = total > 0 ? Math.max(...entries.map(([,c])=>c)) : 0;
         const winnerUids = total > 0 ? entries.filter(([,c])=>c===top).map(([uid])=>uid) : [];
-        return settingsRef.set({ winnerUids, totalVotes: total }, { merge:true }).then(() => {
+        return settingsRef.set({ revealed:true, revealing:false, winnerUids, totalVotes: total }, { merge:true }).then(() => {
           if (winnerUids.length === 1){
             const wUid = winnerUids[0];
             const wName = (state.profiles[wUid] && state.profiles[wUid].name) || '';
@@ -684,9 +703,9 @@ function initApp(){
 
   function onRevealClick(){
     if (state.settings.votingOpen) return; // end the session before revealing
-    uiRevealing = true;
-    render();
-    setTimeout(()=>{ uiRevealing = false; doReveal(); }, 1100);
+    const btn = document.getElementById('reveal-btn');
+    if (btn){ btn.disabled = true; btn.textContent = 'Revealing…'; }
+    doReveal();
   }
 
   function awardBonus(uid){
@@ -702,15 +721,31 @@ function initApp(){
     batch.commit().catch(err=>alert('Could not award bonus: ' + err.message));
   }
 
-  function startNewWeek(){
+  // Nobody clicks a button for this — the moment the calendar week changes, whichever
+  // admin/owner happens to have the app open silently clears the previous week's votes
+  // and opens a fresh one, whether or not anyone got around to revealing the last one.
+  // (Requires an admin's browser to actually be connected at some point after the
+  // boundary — there's no backend here to run this with nobody watching at all.)
+  let rollingWeek = false;
+  function maybeRollWeek(){
+    if (!state.loadedProfiles || !state.loadedSettings || rollingWeek) return;
+    const me = state.profiles[state.user.uid];
+    if (!isAdmin(me)) return;
+    const key = getWeekKey();
+    if (state.settings.currentWeek === key) return;
+    rollingWeek = true;
     const batch = db.batch();
     Object.keys(state.profiles).forEach(uid => { batch.delete(myvoteCol.doc(uid)); });
     tallyCol.get().then(tallySnap => {
       tallySnap.forEach(doc => batch.delete(doc.ref));
       return batch.commit();
     }).then(()=>{
-      settingsRef.set({ revealed:false, bonusAwardedUids:[], winnerUids:[], totalVotes:0, votingOpen:false }, { merge:true });
-    }).catch(err=>alert('Could not start new week: ' + err.message));
+      return settingsRef.set({
+        revealed:false, revealing:false, bonusAwardedUids:[], winnerUids:[], totalVotes:0,
+        votingOpen:false, currentWeek:key
+      }, { merge:true });
+    }).catch(err=>console.warn('Automatic week rollover failed:', err.message))
+      .finally(()=>{ rollingWeek = false; });
   }
 
   // Only an admin/owner may open or close the voting window. While closed, nobody —
@@ -729,7 +764,6 @@ function initApp(){
       appEl.innerHTML = `<div class="loading"><div class="spinner"></div><div class="loading-text">Loading</div>${state.loadErrorMsg ? `<p style="color:var(--accent);font-size:13px;max-width:320px;text-align:center;line-height:1.5;">${esc(state.loadErrorMsg)}</p>` : ''}</div>`;
       return;
     }
-    if (uiRevealing){ renderTallying(); return; }
 
     const me = state.profiles[state.user.uid];
     if (!me){ renderNoAccess(); return; }
@@ -741,20 +775,62 @@ function initApp(){
       appEl.innerHTML = `<div class="loading"><div class="spinner"></div><div class="loading-text">Loading</div></div>`;
       return;
     }
-    if (nowRevealed && !lastRevealedState){
-      setTimeout(launchSparks, 50);
+
+    // The drum-roll ceremony: the moment ANY client sees revealed flip to true for
+    // the first time, it starts an identical fixed-length local countdown before
+    // actually showing the winner. Since Firestore pushes that flip to every
+    // connected listener within a couple hundred ms of each other, everyone's
+    // countdown starts at nearly the same real moment and therefore ends at nearly
+    // the same moment too — no shared clock or absolute timestamp required.
+    if (nowRevealed && !lastRevealedState && !ceremonyPending){
+      ceremonyPending = true;
+      setTimeout(() => {
+        ceremonyPending = false;
+        launchSparks();
+        speakWinnerAnnouncement();
+        render();
+      }, REVEAL_CEREMONY_MS);
     }
     lastRevealedState = nowRevealed;
 
+    if (ceremonyPending){ renderDrumRoll(); return; }
     if (nowRevealed){ renderReveal(me); } else { renderMain(me); }
   }
 
-  function renderTallying(){
+  function renderDrumRoll(){
     appEl.innerHTML = `
-      <div class="tallying">
-        <div class="spinner"></div>
-        <p>Tallying the votes</p>
+      <div class="gate burst drumroll">
+        <div class="gate-inner">
+          <div class="trophy-wrap">${ICON_TROPHY}</div>
+          <p class="gate-eyebrow">Drum roll…</p>
+          <h1>Revealing the Star Worker of the Week</h1>
+        </div>
       </div>`;
+  }
+
+  // Speaks the announcement aloud via the browser's own text-to-speech (Web Speech
+  // API) — runs independently on every device, in whatever voice that device has,
+  // starting at the same moment every client's drum-roll ends.
+  function speakWinnerAnnouncement(){
+    if (!('speechSynthesis' in window)) return;
+    const total = state.settings.totalVotes || 0;
+    const winnerUids = state.settings.winnerUids || [];
+    let line;
+    if (total === 0){
+      line = "No votes were cast this week.";
+    } else if (winnerUids.length === 1){
+      const name = (state.profiles[winnerUids[0]] && state.profiles[winnerUids[0]].name) || 'Unknown';
+      line = `And the Star Worker of the Week is... ${name}!`;
+    } else {
+      const names = winnerUids.map(u => (state.profiles[u] && state.profiles[u].name) || '?').join(' and ');
+      line = `It's a tie, between ${names}!`;
+    }
+    try{
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(line);
+      utter.rate = 0.95;
+      window.speechSynthesis.speak(utter);
+    }catch(e){ console.warn('Speech synthesis unavailable:', e); }
   }
 
   function renderGate(){
@@ -1151,14 +1227,12 @@ function initApp(){
       <h1>${total} vote${total===1?'':'s'} cast this week</h1>
       ${winnerBlock}
       ${scoreboardHTML}
-      ${admin ? `<button class="ghost-btn" id="newweek-btn">Start New Week</button>` : ''}
+      ${admin ? `<p class="form-hint" style="margin-bottom:20px;">Next week opens automatically once the calendar week changes — nothing to click.</p>` : ''}
       ${financeAccess ? payoutQueueHTML() : ''}
       ${admin ? manageTeamHTML() : ''}
     `;
 
     document.getElementById('logout-btn').addEventListener('click', logout);
-    const nw = document.getElementById('newweek-btn');
-    if (nw) nw.addEventListener('click', () => { if (confirm("Clear this week's votes and start fresh?")) startNewWeek(); });
     appEl.querySelectorAll('[data-award]').forEach(btn => btn.addEventListener('click', () => awardBonus(btn.dataset.award)));
     if (financeAccess) bindPayoutQueue();
     if (admin) bindManageTeam();
