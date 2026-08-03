@@ -206,14 +206,49 @@ details.manage[open] summary:after{content:'\2212';}
 /* ---- Reveal ---- */
 .spinner{ width:30px; height:30px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
 
-/* ---- Drum roll (the synchronized suspense beat before every reveal) ---- */
-@keyframes drumShake{ 0%,100%{ transform:rotate(0deg); } 20%{ transform:rotate(-8deg); } 40%{ transform:rotate(6deg); } 60%{ transform:rotate(-5deg); } 80%{ transform:rotate(4deg); } }
+/* ---- Reveal wheel — the synchronized suspense beat before every reveal.
+   Spins for REVEAL_SPIN_MS, lands exactly on settings.winnerUids (decided
+   server-side already; the spin is theatre, not chance), then the winner
+   pops out of it in .wheel-popup. Sized huge via vw/vh on purpose. ---- */
 @keyframes pulseFade{ 0%,100%{ opacity:1; } 50%{ opacity:.4; } }
 .drumroll .gate-inner{ align-items:center; text-align:center; max-width:none; }
-.drumroll .trophy-wrap{ margin-bottom:8px; }
-.drumroll .trophy-wrap .icon{ display:inline-block; animation:drumShake .3s ease-in-out infinite; }
 .drumroll .gate-eyebrow{ animation:pulseFade 1s ease-in-out infinite; }
-.drumroll h1{ max-width:20ch; }
+.drumroll h1{ max-width:26ch; margin-bottom:24px; }
+
+.wheel-wrap{ position:relative; width:min(80vw, 62vh, 560px); aspect-ratio:1/1; margin:8px auto 0; }
+.wheel{
+  position:absolute; inset:0; border-radius:50%; overflow:hidden;
+  border:5px solid var(--accent); box-shadow:var(--shadow);
+  transition:transform 5s cubic-bezier(.1,.7,.15,1);
+}
+.wheel-label{
+  position:absolute; transform:translate(-50%,-50%);
+  font-family:'Space Grotesk',sans-serif; font-weight:700;
+  font-size:clamp(10px,2.2vw,15px); color:var(--text);
+  max-width:30%; text-align:center; line-height:1.15; overflow-wrap:anywhere;
+  text-shadow:0 1px 3px rgba(0,0,0,.5);
+}
+.wheel-pointer{
+  position:absolute; top:-8px; left:50%; transform:translateX(-50%);
+  width:0; height:0; border-left:18px solid transparent; border-right:18px solid transparent;
+  border-top:28px solid var(--accent); z-index:3; filter:drop-shadow(0 2px 4px rgba(0,0,0,.5));
+}
+.wheel-hub{
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  width:22%; height:22%; min-width:56px; min-height:56px; border-radius:50%;
+  background:var(--bg-card); border:3px solid var(--accent);
+  display:flex; align-items:center; justify-content:center; color:var(--accent);
+  z-index:2; box-shadow:var(--shadow);
+}
+.wheel-popup{
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) scale(0); opacity:0;
+  z-index:5; background:var(--bg-card); border:3px solid var(--accent); border-radius:20px;
+  padding:20px 28px; text-align:center; box-shadow:0 12px 44px rgba(0,0,0,.6);
+  transition:transform .6s cubic-bezier(.34,1.56,.64,1), opacity .4s ease; max-width:88%;
+}
+.wheel-popup.show{ transform:translate(-50%,-50%) scale(1); opacity:1; }
+.wheel-popup .popup-label{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); margin:0 0 6px; }
+.wheel-popup .popup-name{ font-family:Georgia,'Iowan Old Style','Times New Roman',serif; font-style:italic; font-weight:700; font-size:clamp(22px,6vw,34px); color:var(--text); margin:0; text-wrap:balance; }
 
 .winner-card{ background:var(--bg-card); border:1px solid var(--border); border-radius:20px; padding:34px 22px; text-align:center; margin-bottom:26px; box-shadow:var(--shadow); animation:revealIn .5s cubic-bezier(.16,1,.3,1); }
 .trophy-wrap{ position:relative; display:inline-flex; align-items:center; justify-content:center; width:76px; height:76px; margin-bottom:14px; }
@@ -354,9 +389,12 @@ function initApp(){
     loadedProfiles:false, loadedSettings:false, loadedMyVote:false, loadedMyBalance:false, loadedTally:false, loadedBalances:false,
     loadErrorMsg: null
   };
-  let ceremonyPending = false; // true from the moment a fresh reveal is seen until the local drum-roll finishes
+  let ceremonyPending = false; // true from the moment a fresh reveal is seen until the ceremony fully finishes
+  let ceremonyPhase = null;    // 'spinning' | 'landed' | null
+  let wheelPhaseRendered = null; // guards against rebuilding the wheel's DOM (and restarting its CSS spin) on unrelated re-renders
   let lastRevealedState = false;
-  const REVEAL_CEREMONY_MS = 5000;
+  const REVEAL_SPIN_MS = 5000;      // how long the wheel spins for, per your "5 seconds" spec
+  const REVEAL_POPUP_HOLD_MS = 2600; // how long the landed wheel + winner popup stay up before the full results page
   let gateMode = 'gate'; // 'gate' | 'login' | 'signup' — which logged-out screen is showing
   const SIGNUP_EMAIL_DOMAIN = '@blacfox.com'; // self-signup is restricted to this domain — change or remove if that's wrong
 
@@ -802,41 +840,123 @@ function initApp(){
     const nowRevealed = !!state.settings.revealed;
     const admin = isAdmin(me);
 
+    // The reveal ceremony: the moment ANY client sees revealed flip to true for the
+    // first time, it starts an identical fixed-length sequence (spin the wheel, then
+    // hold on the landed winner) before showing the full results page. This runs for
+    // everyone immediately — it deliberately doesn't wait on the admin-only tally
+    // subscription below, since the wheel only needs winnerUids/totalVotes, which are
+    // already written by the time revealed flips true. Since Firestore pushes that
+    // flip to every connected listener within a couple hundred ms of each other,
+    // everyone's sequence starts at nearly the same real moment and therefore lands at
+    // nearly the same moment too — no shared clock or absolute timestamp required.
+    if (nowRevealed && !lastRevealedState && !ceremonyPending){
+      ceremonyPending = true;
+      ceremonyPhase = 'spinning';
+      wheelPhaseRendered = null;
+      setTimeout(() => {
+        ceremonyPhase = 'landed';
+        launchSparks();
+        speakWinnerAnnouncement();
+        render();
+        setTimeout(() => {
+          ceremonyPending = false; ceremonyPhase = null; wheelPhaseRendered = null;
+          render();
+        }, REVEAL_POPUP_HOLD_MS);
+      }, REVEAL_SPIN_MS);
+    }
+    lastRevealedState = nowRevealed;
+
+    if (ceremonyPending){ renderDrumRoll(ceremonyPhase, me); return; }
+
     if (nowRevealed && admin && !state.loadedTally){
       appEl.innerHTML = `<div class="loading"><div class="spinner"></div><div class="loading-text">Loading</div></div>`;
       return;
     }
 
-    // The drum-roll ceremony: the moment ANY client sees revealed flip to true for
-    // the first time, it starts an identical fixed-length local countdown before
-    // actually showing the winner. Since Firestore pushes that flip to every
-    // connected listener within a couple hundred ms of each other, everyone's
-    // countdown starts at nearly the same real moment and therefore ends at nearly
-    // the same moment too — no shared clock or absolute timestamp required.
-    if (nowRevealed && !lastRevealedState && !ceremonyPending){
-      ceremonyPending = true;
-      setTimeout(() => {
-        ceremonyPending = false;
-        launchSparks();
-        speakWinnerAnnouncement();
-        render();
-      }, REVEAL_CEREMONY_MS);
-    }
-    lastRevealedState = nowRevealed;
-
-    if (ceremonyPending){ renderDrumRoll(); return; }
     if (nowRevealed){ renderReveal(me); } else { renderMain(me); }
   }
 
-  function renderDrumRoll(){
-    appEl.innerHTML = `
-      <div class="gate burst drumroll">
-        <div class="gate-inner">
-          <div class="trophy-wrap">${ICON_TROPHY}</div>
-          <p class="gate-eyebrow">Drum roll…</p>
-          <h1>Revealing the Star Worker of the Week</h1>
-        </div>
-      </div>`;
+  // The wheel shows every teammate who could have won, spins for REVEAL_SPIN_MS, and
+  // lands precisely on whoever actually got the most votes (settings.winnerUids) —
+  // the spin is just theatre; the result was already decided server-side in doReveal().
+  // wheelPhaseRendered guards the DOM: once the wheel is spinning, unrelated re-renders
+  // (a payout update, a tally subscription landing, etc.) must NOT rebuild it, or its
+  // CSS transition would restart from zero and the spin would visibly stutter/reset.
+  function renderDrumRoll(phase){
+    if (wheelPhaseRendered === phase) return;
+
+    if (phase === 'spinning'){
+      wheelPhaseRendered = 'spinning';
+      const names = Object.entries(state.profiles).sort((a,b)=>a[1].name.localeCompare(b[1].name));
+      const n = Math.max(names.length, 1);
+      const wedge = 360 / n;
+      const colors = ['var(--bg-card)', 'var(--bg-elevated)'];
+      const bgStops = names.map((_,i) => `${colors[i%2]} ${i*wedge}deg ${(i+1)*wedge}deg`).join(', ');
+      const labelsHTML = names.map(([uid,p], i) => {
+        const mid = i*wedge + wedge/2;
+        const rad = (mid - 90) * Math.PI/180;
+        const x = 50 + 38*Math.cos(rad);
+        const y = 50 + 38*Math.sin(rad);
+        return `<span class="wheel-label" style="left:${x}%;top:${y}%;">${esc(p.name)}</span>`;
+      }).join('');
+
+      appEl.innerHTML = `
+        <div class="gate drumroll">
+          <div class="gate-inner">
+            <p class="gate-eyebrow">Drum roll…</p>
+            <h1>Revealing the Star Worker of the Week</h1>
+            <div class="wheel-wrap">
+              <div class="wheel-pointer"></div>
+              <div class="wheel" id="reveal-wheel" style="background:conic-gradient(from 0deg, ${bgStops});">
+                ${labelsHTML}
+              </div>
+              <div class="wheel-hub">${ICON_TROPHY}</div>
+            </div>
+          </div>
+        </div>`;
+
+      const wheel = document.getElementById('reveal-wheel');
+      const total = state.settings.totalVotes || 0;
+      const winnerUids = state.settings.winnerUids || [];
+      const extraSpins = 6;
+      let targetDeg = extraSpins * 360;
+      if (total > 0 && winnerUids.length > 0){
+        const idx = Math.max(0, names.findIndex(([uid]) => uid === winnerUids[0]));
+        const mid = idx*wedge + wedge/2;
+        targetDeg += 360 - mid;
+      }
+      // Two rAFs: the first lets the browser paint the wheel at rotate(0) first, so the
+      // transition to targetDeg on the second frame is guaranteed to actually animate
+      // instead of jumping straight there.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (wheel) wheel.style.transform = `rotate(${targetDeg}deg)`;
+      }));
+      return;
+    }
+
+    if (phase === 'landed'){
+      wheelPhaseRendered = 'landed';
+      const wrap = document.querySelector('.wheel-wrap');
+      if (!wrap || document.getElementById('wheel-popup')) return;
+      const total = state.settings.totalVotes || 0;
+      const winnerUids = state.settings.winnerUids || [];
+      let inner;
+      if (total === 0){
+        inner = `<p class="popup-label">No votes were cast</p>`;
+      } else if (winnerUids.length === 1){
+        const wname = (state.profiles[winnerUids[0]] && state.profiles[winnerUids[0]].name) || 'Unknown';
+        inner = `<p class="popup-label">Star Worker of the Week</p><p class="popup-name">${esc(wname)}</p>`;
+      } else {
+        const names2 = winnerUids.map(u => (state.profiles[u] && state.profiles[u].name) || '?').join(' & ');
+        inner = `<p class="popup-label">It's a tie!</p><p class="popup-name">${esc(names2)}</p>`;
+      }
+      const popup = document.createElement('div');
+      popup.id = 'wheel-popup';
+      popup.className = 'wheel-popup';
+      popup.innerHTML = inner;
+      wrap.appendChild(popup);
+      requestAnimationFrame(() => requestAnimationFrame(() => popup.classList.add('show')));
+    }
   }
 
   // Speaks the announcement aloud via the browser's own text-to-speech (Web Speech
