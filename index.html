@@ -135,6 +135,14 @@ h1{ font-family:Georgia,'Iowan Old Style','Times New Roman',serif; font-style:it
 .balance-label{ font-size:13px; color:var(--text-muted); }
 .balance-amount{ font-family:'JetBrains Mono',monospace; font-weight:700; font-size:18px; }
 .balance-status{ font-size:13px; color:var(--text-muted); margin-bottom:10px; }
+.cashout-form{ display:flex; gap:8px; }
+.cashout-form input{
+  flex:1; min-width:0; font-family:'JetBrains Mono',monospace; font-size:16px;
+  padding:11px 12px; min-height:44px; border-radius:10px;
+  border:1px solid var(--border); background:var(--bg-elevated); color:var(--text);
+}
+.cashout-form input:focus{ outline:none; border-color:var(--accent); }
+.cashout-form .ghost-btn{ white-space:nowrap; }
 
 /* ---- Voting ---- */
 .vote-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; margin-bottom:24px; }
@@ -532,13 +540,14 @@ function initApp(){
   }
 
   // ---------------- Payouts ----------------
-  function requestCashout(){
+  function requestCashout(amount){
     const me = state.profiles[state.user.uid];
-    if (!me || !(me.balance > 0) || state.myPayout) return;
+    const amt = Math.floor(Number(amount));
+    if (!me || state.myPayout || !(amt > 0) || amt > (me.balance||0)) return;
     payoutCol.add({
       uid: state.user.uid,
       name: me.name,
-      amount: me.balance,
+      amount: amt,
       status: 'pending',
       requestedAt: firebase.firestore.FieldValue.serverTimestamp(),
       resolvedAt: null,
@@ -971,7 +980,10 @@ function initApp(){
       cashoutHTML = `
         <div class="balance-card">
           <div class="balance-card-top"><span class="balance-label">Your balance</span><span class="balance-amount">B$${(me.balance||0).toLocaleString()}</span></div>
-          <button class="ghost-btn" id="cashout-btn">Cash Out</button>
+          <div class="cashout-form">
+            <input type="number" id="cashout-amount" min="1" max="${me.balance}" step="1" placeholder="Amount" inputmode="numeric">
+            <button class="ghost-btn" id="cashout-btn">Cash Out</button>
+          </div>
         </div>`;
     } else {
       cashoutHTML = '';
@@ -1032,7 +1044,11 @@ function initApp(){
     if (revealBtn) revealBtn.addEventListener('click', onRevealClick);
     const cashoutBtn = document.getElementById('cashout-btn');
     if (cashoutBtn) cashoutBtn.addEventListener('click', () => {
-      if (confirm(`Request a cash-out of B$${me.balance}?${financeName ? ' ' + financeName + ' will review it.' : ''}`)) requestCashout();
+      const amountInput = document.getElementById('cashout-amount');
+      const amount = Math.floor(Number(amountInput.value));
+      if (!amount || amount <= 0){ alert('Enter an amount to cash out.'); return; }
+      if (amount > (me.balance||0)){ alert(`You only have B$${me.balance||0} available.`); return; }
+      if (confirm(`Request a cash-out of B$${amount}?${financeName ? ' ' + financeName + ' will review it.' : ''}`)) requestCashout(amount);
     });
     const cancelBtn = document.getElementById('cancel-cashout-btn');
     if (cancelBtn) cancelBtn.addEventListener('click', () => { if (state.myPayout) cancelCashout(state.myPayout.id); });
