@@ -223,10 +223,16 @@ details.manage[open] summary:after{content:'\2212';}
 }
 .wheel-label{
   position:absolute; transform:translate(-50%,-50%);
+  transition:transform 5s cubic-bezier(.1,.7,.15,1);
   font-family:'Space Grotesk',sans-serif; font-weight:700;
   font-size:clamp(10px,2.2vw,15px); color:var(--text);
   max-width:30%; text-align:center; line-height:1.15; overflow-wrap:anywhere;
   text-shadow:0 1px 3px rgba(0,0,0,.5);
+}
+.wheel-countdown{
+  font-family:'Space Grotesk',sans-serif; font-weight:700; color:var(--accent);
+  font-size:clamp(64px,18vw,140px); line-height:1; margin:18px 0 0;
+  animation:pulseFade 1s ease-in-out infinite;
 }
 .wheel-pointer{
   position:absolute; top:-8px; left:50%; transform:translateX(-50%);
@@ -390,11 +396,13 @@ function initApp(){
     loadErrorMsg: null
   };
   let ceremonyPending = false; // true from the moment a fresh reveal is seen until the ceremony fully finishes
-  let ceremonyPhase = null;    // 'spinning' | 'landed' | null
+  let ceremonyPhase = null;    // 'countdown' | 'spinning' | 'landed' | null
+  let ceremonyCount = 5;       // ticks down during the 'countdown' phase
   let wheelPhaseRendered = null; // guards against rebuilding the wheel's DOM (and restarting its CSS spin) on unrelated re-renders
   let lastRevealedState = false;
   let firstSettingsSnapshot = true; // so opening the app *after* a reveal just shows the results — the ceremony only plays for people watching live when it happens
-  const REVEAL_SPIN_MS = 5000;      // how long the wheel spins for, per your "5 seconds" spec
+  const REVEAL_COUNTDOWN_MS = 5000; // "5… 4… 3… 2… 1…" before the wheel starts spinning, per your "count down of the 5 seconds" spec
+  const REVEAL_SPIN_MS = 5000;      // how long the wheel spins for once the countdown hits zero
   const REVEAL_POPUP_HOLD_MS = 2600; // how long the landed wheel + winner popup stay up before the full results page
   let gateMode = 'gate'; // 'gate' | 'login' | 'signup' — which logged-out screen is showing
   const SIGNUP_EMAIL_DOMAIN = '@blacfox.com'; // self-signup is restricted to this domain — change or remove if that's wrong
@@ -748,13 +756,15 @@ function initApp(){
   // so no client can ever observe revealed=true before the winner is actually known.
   // Everyone's synchronized drum-roll ceremony (see render()) keys off that single write.
   function doReveal(){
-    db.runTransaction(tx => tx.get(settingsRef).then(sSnap => {
+    let claimedLock = false;
+    return db.runTransaction(tx => tx.get(settingsRef).then(sSnap => {
       const s = sSnap.data() || {};
       if (s.revealed || s.revealing) return false;
       tx.set(settingsRef, { revealing:true }, { merge:true });
       return true;
     })).then(claimed => {
-      if (!claimed) return;
+      claimedLock = claimed;
+      if (!claimed) return false;
       return tallyCol.get().then(tallySnap => {
         const tally = {};
         tallySnap.forEach(d => tally[d.id] = d.data().count || 0);
@@ -788,16 +798,31 @@ function initApp(){
             });
             return batch.commit();
           }
-        });
+        }).then(() => true);
       });
-    }).catch(err=>alert(friendlyError(err, 'Could not reveal the results. Try again in a moment.')));
+    }).catch(err => {
+      // If we'd already claimed the lock, an error past this point (a flaky tally
+      // read, a bonus batch that failed, etc.) must not leave revealing:true stuck —
+      // that would silently block every future reveal attempt for this week with no
+      // way to recover short of changing weeks. Release the lock so it can be retried.
+      if (claimedLock){
+        settingsRef.set({ revealing:false }, { merge:true }).catch(()=>{});
+      }
+      alert(friendlyError(err, 'Could not reveal the results. Try again in a moment.'));
+      return false;
+    });
   }
 
   function onRevealClick(){
     if (state.settings.votingOpen) return; // end the session before revealing
     const btn = document.getElementById('reveal-btn');
     if (btn){ btn.disabled = true; btn.textContent = 'Revealing…'; }
-    doReveal();
+    doReveal().then(done => {
+      if (!done && btn){
+        btn.disabled = false; btn.textContent = 'Reveal results';
+        alert('Nothing happened — this week may already be revealed, or another reveal is in progress. Try again in a moment.');
+      }
+    });
   }
 
   function awardBonus(uid){
@@ -923,18 +948,30 @@ function initApp(){
     // nearly the same moment too — no shared clock or absolute timestamp required.
     if (nowRevealed && !lastRevealedState && !ceremonyPending){
       ceremonyPending = true;
-      ceremonyPhase = 'spinning';
+      ceremonyPhase = 'countdown';
+      ceremonyCount = 5;
       wheelPhaseRendered = null;
-      setTimeout(() => {
-        ceremonyPhase = 'landed';
-        launchSparks();
-        speakWinnerAnnouncement();
-        render();
-        setTimeout(() => {
-          ceremonyPending = false; ceremonyPhase = null; wheelPhaseRendered = null;
+      const countdownTick = setInterval(() => {
+        ceremonyCount -= 1;
+        if (ceremonyCount <= 0){
+          clearInterval(countdownTick);
+          ceremonyPhase = 'spinning';
+          wheelPhaseRendered = null;
           render();
-        }, REVEAL_POPUP_HOLD_MS);
-      }, REVEAL_SPIN_MS);
+          setTimeout(() => {
+            ceremonyPhase = 'landed';
+            launchSparks();
+            speakWinnerAnnouncement();
+            render();
+            setTimeout(() => {
+              ceremonyPending = false; ceremonyPhase = null; wheelPhaseRendered = null;
+              render();
+            }, REVEAL_POPUP_HOLD_MS);
+          }, REVEAL_SPIN_MS);
+        } else {
+          render();
+        }
+      }, REVEAL_COUNTDOWN_MS / 5);
     }
     lastRevealedState = nowRevealed;
 
@@ -955,6 +992,24 @@ function initApp(){
   // (a payout update, a tally subscription landing, etc.) must NOT rebuild it, or its
   // CSS transition would restart from zero and the spin would visibly stutter/reset.
   function renderDrumRoll(phase){
+    // The countdown number changes every tick while phase stays 'countdown', so it
+    // can't use the wheelPhaseRendered guard below (that guard exists to stop the
+    // *wheel itself* from being rebuilt mid-spin) — just update the digit in place.
+    if (phase === 'countdown'){
+      const existing = document.getElementById('wheel-countdown');
+      if (existing){ existing.textContent = ceremonyCount; return; }
+      wheelPhaseRendered = 'countdown';
+      appEl.innerHTML = `
+        <div class="gate drumroll">
+          <div class="gate-inner">
+            <p class="gate-eyebrow">Drum roll…</p>
+            <h1>Revealing the Star Worker of the Week</h1>
+            <div class="wheel-countdown" id="wheel-countdown">${ceremonyCount}</div>
+          </div>
+        </div>`;
+      return;
+    }
+
     if (wheelPhaseRendered === phase) return;
 
     if (phase === 'spinning'){
@@ -1002,6 +1057,14 @@ function initApp(){
       // instead of jumping straight there.
       requestAnimationFrame(() => requestAnimationFrame(() => {
         if (wheel) wheel.style.transform = `rotate(${targetDeg}deg)`;
+        // The labels are children of the wheel, so they'd otherwise spin along with it
+        // and land sideways/upside-down for anywhere from about a quarter to three
+        // quarters of the possible landing angles. Counter-rotate each one by the exact
+        // same amount, on the same transition, so it visually cancels out and every name
+        // (including the winner's) stays upright the whole time, not just at rest.
+        document.querySelectorAll('.wheel-label').forEach(el => {
+          el.style.transform = `translate(-50%,-50%) rotate(${-targetDeg}deg)`;
+        });
       }));
       return;
     }
