@@ -25,7 +25,7 @@ export function WinnerPopup({
   if (totalVotes === 0) {
     label = 'No votes were cast';
   } else if (winnerUids.length === 1) {
-    label = 'Star Worker of the Week';
+    label = 'Star Player of the Week';
     name = profiles[winnerUids[0]!]?.name ?? 'Unknown';
   } else {
     label = "It's a tie!";

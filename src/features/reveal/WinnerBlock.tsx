@@ -60,7 +60,7 @@ export function WinnerBlock({
         <p className="m-0 mb-1.5 font-display text-[clamp(22px,6vw,32px)] font-bold [overflow-wrap:anywhere]">
           {winner?.name ?? 'Unknown'}
         </p>
-        <p className="m-0 font-mono text-xs uppercase tracking-[0.05em] text-text-muted">Star Worker of the Week</p>
+        <p className="m-0 font-mono text-xs uppercase tracking-[0.05em] text-text-muted">Star Player of the Week</p>
         <p className="mt-3.5 inline-flex items-center gap-1.5 font-mono text-sm font-bold text-accent">
           <IconWallet /> + B${BONUS_AMOUNT} awarded
         </p>

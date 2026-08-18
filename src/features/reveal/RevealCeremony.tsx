@@ -12,7 +12,7 @@ function winnerAnnouncement(totalVotes: number, winnerUids: string[], profiles: 
   if (totalVotes === 0) return 'No votes were cast this week.';
   if (winnerUids.length === 1) {
     const name = profiles[winnerUids[0]!]?.name ?? 'Unknown';
-    return `And the Star Worker of the Week is... ${name}!`;
+    return `And the Star Player of the Week is... ${name}!`;
   }
   const names = winnerUids.map((u) => profiles[u]?.name ?? '?').join(' and ');
   return `It's a tie, between ${names}!`;
@@ -43,7 +43,7 @@ export function RevealCeremony({
         Drum roll…
       </p>
       <h1 className="m-0 mb-6 max-w-[26ch] font-serif text-[clamp(24px,6vw,34px)] font-bold italic leading-[1.15]">
-        Revealing the Star Worker of the Week
+        Revealing the Star Player of the Week
       </h1>
       <Wheel profiles={profiles} winnerUids={settings.winnerUids} totalVotes={settings.totalVotes}>
         {phase === 'landed' && (

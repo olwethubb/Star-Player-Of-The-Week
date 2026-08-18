@@ -7,7 +7,7 @@ export function Countdown({ count }: { count: number }) {
         Drum roll…
       </p>
       <h1 className="m-0 mb-6 max-w-[26ch] font-serif text-[clamp(24px,6vw,34px)] font-bold italic leading-[1.15]">
-        Revealing the Star Worker of the Week
+        Revealing the Star Player of the Week
       </h1>
       <div
         className="animate-pulse-fade mt-[18px] font-display text-[clamp(64px,18vw,140px)] font-bold leading-none text-accent"

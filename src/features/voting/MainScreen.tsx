@@ -36,7 +36,7 @@ export function MainScreen() {
     <>
       <TopBar me={me} balance={myBalance} />
       <h1 className="m-0 mb-2 font-serif text-[clamp(24px,6vw,34px)] font-bold italic leading-[1.15]">
-        Star Worker of the Week
+        Star Player of the Week
       </h1>
       <p className="mb-7 max-w-[520px] text-sm leading-relaxed text-text-muted">
         Vote for the teammate who went above and beyond this week. The winner receives B${BONUS_AMOUNT}. Results

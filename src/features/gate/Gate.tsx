@@ -8,7 +8,7 @@ export function Gate({ onVote, onSignup }: { onVote: () => void; onSignup: () =>
     <GateShell>
       <GateLogo />
       <GateEyebrow>{getWeekLabel()}</GateEyebrow>
-      <GateHeading>Star Worker of the Week</GateHeading>
+      <GateHeading>Star Player of the Week</GateHeading>
       <GateBody>
         Vote for the teammate who went above and beyond this week. The winner takes home B${BONUS_AMOUNT} in
         Blacfox Dollars.

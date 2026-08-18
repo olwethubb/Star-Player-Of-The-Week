@@ -1,4 +1,4 @@
-# Blacfox — Star Worker of the Week
+# Blacfox — Star Player of the Week
 
 React + TypeScript + Vite app, backed by the existing Firebase project
 (`star-player-of-the-week`) — Auth, Firestore, and `firestore.rules` are
