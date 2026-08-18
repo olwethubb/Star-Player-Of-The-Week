@@ -1,0 +1,16 @@
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { App } from './App';
+import { SessionProvider } from '@/context/SessionProvider';
+import { ToastProvider } from '@/components/ui/Toast';
+import '@/styles/globals.css';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <ToastProvider>
+      <SessionProvider>
+        <App />
+      </SessionProvider>
+    </ToastProvider>
+  </StrictMode>,
+);
