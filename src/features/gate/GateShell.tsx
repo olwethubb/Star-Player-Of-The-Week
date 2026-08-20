@@ -14,12 +14,12 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react';
  * keyboard focus still lands on the form first. */
 export function GateShell({ brand, children }: { brand?: ReactNode; children: ReactNode }) {
   return (
-    <div className="lg:grid lg:min-h-screen lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-      <aside className="gate-rays gate-brand-panel relative isolate overflow-hidden px-6 pb-12 pt-9 sm:px-10 lg:flex lg:flex-col lg:justify-between lg:pb-14 lg:pt-14">
+    <div className="gate-rays gate-shell-gradient relative isolate min-h-screen overflow-hidden lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+      <aside className="relative px-6 pb-12 pt-9 sm:px-10 lg:flex lg:flex-col lg:justify-between lg:pb-14 lg:pt-14">
         <GateLogo />
         {brand && <div className="relative z-10 mt-9 lg:mt-0">{brand}</div>}
       </aside>
-      <main className="flex items-start justify-center px-6 pb-14 pt-10 sm:px-10 lg:items-center lg:py-16">
+      <main className="relative z-10 flex items-start justify-center px-6 pb-14 pt-10 sm:px-10 lg:items-center lg:py-16">
         <div className="w-full max-w-[420px]">
           {/* A contained surface, not the old full-width card: sized to its content so
               it reads as a deliberate action panel instead of text adrift in a void. */}
