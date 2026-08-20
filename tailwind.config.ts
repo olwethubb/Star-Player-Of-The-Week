@@ -22,7 +22,7 @@ export default {
         serif: ['Fraunces', 'Georgia', '"Iowan Old Style"', '"Times New Roman"', 'serif'],
       },
       boxShadow: {
-        card: '0 1px 2px rgba(0,0,0,0.35), 0 8px 30px rgba(0,0,0,0.5)',
+        card: '0 1px 2px rgba(32,26,20,0.08), 0 8px 24px rgba(32,26,20,0.10)',
       },
     },
   },

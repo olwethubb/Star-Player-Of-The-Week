@@ -37,7 +37,7 @@ export function WinnerPopup({
     // trophy hub/pointer there); only from `sm:` up does it become the classic
     // absolute-centered overlay, where there's enough room for it to sit on top.
     <div
-      className={`relative z-[5] mx-auto mt-4 max-w-[92%] rounded-[20px] border-[3px] border-accent bg-bg-card px-6 py-4 text-center shadow-[0_12px_44px_rgba(0,0,0,.6)] transition-[transform,opacity] duration-500 [transition-timing-function:cubic-bezier(.34,1.56,.64,1)] sm:absolute sm:left-1/2 sm:top-1/2 sm:mt-0 sm:max-w-[88%] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:px-7 sm:py-5 ${
+      className={`relative z-[5] mx-auto mt-4 max-w-[92%] rounded-[20px] border-[3px] border-accent bg-bg-card px-6 py-4 text-center shadow-[0_12px_40px_rgba(32,26,20,0.35)] transition-[transform,opacity] duration-500 [transition-timing-function:cubic-bezier(.34,1.56,.64,1)] sm:absolute sm:left-1/2 sm:top-1/2 sm:mt-0 sm:max-w-[88%] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:px-7 sm:py-5 ${
         shown ? 'scale-100 opacity-100' : 'scale-95 opacity-0 sm:scale-0'
       }`}
     >

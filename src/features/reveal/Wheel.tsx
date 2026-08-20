@@ -14,7 +14,9 @@ interface WheelProps {
 }
 
 const EXTRA_SPINS = 6;
-const WHEEL_COLORS = ['var(--bg-card)', 'var(--bg-elevated)'];
+// Dedicated wedge tokens, not aliases of bg-card/bg-elevated — those two are
+// identical white in the light theme, which would erase every other wedge.
+const WHEEL_COLORS = ['var(--wheel-wedge-a)', 'var(--wheel-wedge-b)'];
 // Past this many wedges, labels switch to a smaller, tighter font so names stay
 // legible instead of overrunning their neighbors.
 const DENSE_ROSTER_THRESHOLD = 14;
@@ -87,7 +89,7 @@ export function Wheel({ profiles, winnerUids, totalVotes, spinMs, children }: Wh
   return (
     <div className="relative mx-auto mt-2 aspect-square w-[min(80vw,62vh,560px)]">
       <div
-        className="absolute -top-2 left-1/2 z-[3] h-0 w-0 -translate-x-1/2 border-x-[18px] border-t-[28px] border-x-transparent border-t-accent drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]"
+        className="absolute -top-2 left-1/2 z-[3] h-0 w-0 -translate-x-1/2 border-x-[18px] border-t-[28px] border-x-transparent border-t-accent drop-shadow-[0_2px_4px_rgba(32,26,20,0.35)]"
       />
       <div
         ref={wheelRef}
@@ -100,7 +102,7 @@ export function Wheel({ profiles, winnerUids, totalVotes, spinMs, children }: Wh
             ref={(el) => {
               labelRefs.current[i] = el;
             }}
-            className={`motion-exempt absolute line-clamp-2 max-w-[28%] -translate-x-1/2 -translate-y-1/2 overflow-hidden text-center font-display font-bold leading-tight text-text [text-shadow:0_1px_3px_rgba(0,0,0,.5)] transition-transform [transition-timing-function:cubic-bezier(.1,.7,.15,1)] ${
+            className={`motion-exempt absolute line-clamp-2 max-w-[28%] -translate-x-1/2 -translate-y-1/2 overflow-hidden text-center font-display font-bold leading-tight text-text transition-transform [transition-timing-function:cubic-bezier(.1,.7,.15,1)] ${
               dense ? 'text-[clamp(8px,1.6vw,11px)]' : 'text-[clamp(10px,2.2vw,15px)]'
             }`}
             style={{ left: `${labelPositions[i]?.x}%`, top: `${labelPositions[i]?.y}%`, transitionDuration: `${spinMs}ms` }}

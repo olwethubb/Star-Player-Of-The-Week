@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { REVEAL_COUNTDOWN_MS, REVEAL_POPUP_HOLD_MS, REVEAL_SPIN_MS, REVEAL_SPIN_MS_REDUCED } from '@/lib/constants';
+import {
+  REVEAL_COUNTDOWN_MS,
+  REVEAL_COUNTDOWN_START,
+  REVEAL_POPUP_HOLD_MS,
+  REVEAL_SPIN_MS,
+  REVEAL_SPIN_MS_REDUCED,
+} from '@/lib/constants';
 import { prefersReducedMotion } from '@/lib/motion';
 
 export type CeremonyPhase = 'countdown' | 'spinning' | 'landed';
@@ -27,7 +33,12 @@ interface CeremonyState {
  * someone who logs out, misses a reveal happening elsewhere, then logs back in would
  * incorrectly replay the full ceremony instead of landing straight on results. */
 export function useRevealCeremony(revealed: boolean, loadedSettings: boolean, resetKey: unknown): CeremonyState {
-  const [state, setState] = useState<CeremonyState>({ pending: false, phase: null, count: 5, spinMs: REVEAL_SPIN_MS });
+  const [state, setState] = useState<CeremonyState>({
+    pending: false,
+    phase: null,
+    count: REVEAL_COUNTDOWN_START,
+    spinMs: REVEAL_SPIN_MS,
+  });
   const firstSnapshotSeen = useRef(false);
   const lastRevealed = useRef(false);
   const pendingRef = useRef(false);
@@ -51,7 +62,7 @@ export function useRevealCeremony(revealed: boolean, loadedSettings: boolean, re
     if (startCeremony) {
       pendingRef.current = true;
       const spinMs = prefersReducedMotion() ? REVEAL_SPIN_MS_REDUCED : REVEAL_SPIN_MS;
-      setState({ pending: true, phase: 'countdown', count: 5, spinMs });
+      setState({ pending: true, phase: 'countdown', count: REVEAL_COUNTDOWN_START, spinMs });
 
       const countdownTick = setInterval(() => {
         setState((prev) => {
@@ -62,13 +73,13 @@ export function useRevealCeremony(revealed: boolean, loadedSettings: boolean, re
           }
           return { ...prev, count: nextCount };
         });
-      }, REVEAL_COUNTDOWN_MS / 5);
+      }, REVEAL_COUNTDOWN_MS / REVEAL_COUNTDOWN_START);
 
       const spinTimer = setTimeout(() => {
         setState((prev) => ({ ...prev, phase: 'landed', count: 0 }));
         const holdTimer = setTimeout(() => {
           pendingRef.current = false;
-          setState({ pending: false, phase: null, count: 5, spinMs: REVEAL_SPIN_MS });
+          setState({ pending: false, phase: null, count: REVEAL_COUNTDOWN_START, spinMs: REVEAL_SPIN_MS });
         }, REVEAL_POPUP_HOLD_MS);
         return () => clearTimeout(holdTimer);
       }, REVEAL_COUNTDOWN_MS + spinMs);

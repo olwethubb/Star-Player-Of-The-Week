@@ -9,7 +9,15 @@ interface Spark {
   delay: number;
 }
 
-const COLORS = ['var(--accent)', 'var(--accent-glow-55)', 'var(--text-muted)'];
+// Real confetti colors, not UI tokens — the accent alone (or worse, --text-muted,
+// which is a drab grey-brown) reads as dust rather than celebration on a light page.
+const COLORS = [
+  'var(--accent)',
+  'var(--confetti-gold)',
+  'var(--confetti-pink)',
+  'var(--confetti-teal)',
+  'var(--confetti-violet)',
+];
 const SPARK_COUNT = 36;
 
 let nextId = 0;

@@ -8,8 +8,14 @@ export function GateShell({ children }: { children: ReactNode }) {
   );
 }
 
+/** The logo artwork is white-on-transparent, so on the light theme's white card it
+ * needs a dark plate behind it to be visible at all. */
 export function GateLogo() {
-  return <img src="/logo.png" alt="Blacfox" className="mb-9 block h-[133px] w-auto self-start sm:mb-16" />;
+  return (
+    <div className="mb-9 self-start rounded-2xl bg-text px-5 py-3 sm:mb-16">
+      <img src="/logo.png" alt="Blacfox" className="block h-[104px] w-auto" />
+    </div>
+  );
 }
 
 export function GateEyebrow({ children }: { children: ReactNode }) {

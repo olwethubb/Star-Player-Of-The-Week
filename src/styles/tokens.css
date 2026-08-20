@@ -1,13 +1,24 @@
 :root {
-  --bg: #1e160f;
-  --bg-elevated: #2b2117;
-  --bg-card: #302418;
-  --text: #f5efe3;
-  --text-muted: #c9b79b;
-  --border: rgba(245, 239, 227, 0.14);
-  --border-soft: rgba(245, 239, 227, 0.08);
-  --accent: #f05d2d;
+  --bg: #fff8f0;
+  --bg-elevated: #ffffff;
+  --bg-card: #ffffff;
+  --text: #201a14;
+  --text-muted: #7a6f5f;
+  --border: rgba(32, 26, 20, 0.12);
+  --border-soft: rgba(32, 26, 20, 0.06);
+  --accent: #ff5a1f;
   --accent-contrast: #241205;
   --accent-glow-35: color-mix(in srgb, var(--accent) 35%, transparent);
   --accent-glow-55: color-mix(in srgb, var(--accent) 55%, transparent);
+  /* The reveal wheel's alternating wedge colors are their own tokens, not aliases of
+     bg-card/bg-elevated — those two are identical white in this light theme, which
+     would make every other wedge invisible if the wheel just reused them. */
+  --wheel-wedge-a: #ffffff;
+  --wheel-wedge-b: #ffe1c4;
+  /* Celebration-only colors, deliberately outside the restrained UI palette —
+     used solely by the winner-reveal confetti burst. */
+  --confetti-gold: #ffc531;
+  --confetti-pink: #ff4d8d;
+  --confetti-teal: #21c7b6;
+  --confetti-violet: #8b5cf6;
 }
