@@ -1,6 +1,12 @@
+import { useState } from 'react';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { CollapsiblePanel } from '@/components/ui/CollapsiblePanel';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { IconTrophy } from '@/components/ui/Icons';
 import { useApprovePayout, useRejectPayout } from '@/hooks/usePayoutActions';
-import type { PayoutRequestWithId } from '@/context/SessionContext';
+import type { PayoutRequestWithId, PayoutWithId } from '@/context/SessionContext';
 
 function PayoutRow({
   request,
@@ -13,40 +19,33 @@ function PayoutRow({
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
 }) {
+  const badgeVariant = request.status === 'paid' ? 'solid' : request.status === 'pending' ? 'outline' : 'muted';
+  const [confirmingReject, setConfirmingReject] = useState(false);
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-border-soft py-3 last:border-b-0">
       <div className="flex min-w-[150px] flex-1 items-center gap-2">
         <span className="font-display text-sm font-semibold [overflow-wrap:anywhere]">{request.name}</span>
-        <span
-          className={`inline-flex items-center rounded-full border px-2.5 py-[3px] font-mono text-[10px] font-bold tracking-[0.03em] ${
-            request.status === 'paid'
-              ? 'border-transparent bg-accent text-accent-contrast'
-              : request.status === 'pending'
-                ? 'border-transparent'
-                : 'border-border text-text-muted'
-          }`}
-        >
-          {request.status}
-        </span>
+        <Badge variant={badgeVariant}>{request.status}</Badge>
       </div>
       <div className="ml-auto flex items-center gap-1.5">
         <span className="font-mono text-[13px]">B${request.amount}</span>
         {withActions && (
           <>
-            <button
-              className="min-h-9 cursor-pointer whitespace-nowrap rounded-full border border-border bg-transparent px-3 py-2 text-xs text-text hover:border-accent hover:text-accent"
-              onClick={() => onApprove(request.id)}
-            >
+            <Button variant="small" onClick={() => onApprove(request.id)}>
               Approve
-            </button>
-            <button
-              className="min-h-9 cursor-pointer whitespace-nowrap rounded-full border border-border bg-transparent px-3 py-2 text-xs text-text hover:border-red-500 hover:text-red-500"
-              onClick={() => {
-                if (confirm('Reject this payout request?')) onReject(request.id);
-              }}
-            >
+            </Button>
+            <Button variant="danger" onClick={() => setConfirmingReject(true)}>
               Reject
-            </button>
+            </Button>
+            <ConfirmDialog
+              open={confirmingReject}
+              onOpenChange={setConfirmingReject}
+              title="Reject this payout request?"
+              description={`${request.name}'s B$${request.amount} cash-out request will be rejected.`}
+              confirmLabel="Reject"
+              danger
+              onConfirm={() => onReject(request.id)}
+            />
           </>
         )}
       </div>
@@ -74,6 +73,28 @@ export function PayoutQueuePanel({ queue, resolvedBy }: { queue: PayoutRequestWi
             <PayoutRow key={r.id} request={r} withActions={false} onApprove={approve} onReject={reject} />
           ))}
         </>
+      )}
+    </CollapsiblePanel>
+  );
+}
+
+/** Previous weeks' winners and their bonus payouts — data that already existed
+ * (every reveal and tie-award writes one of these) but had no view of its own. */
+export function PastWinnersPanel({ history }: { history: PayoutWithId[] }) {
+  return (
+    <CollapsiblePanel title="Past winners">
+      {history.length === 0 ? (
+        <EmptyState icon={<IconTrophy width={18} height={18} />}>
+          Bonus payouts will show up here once a week has been revealed.
+        </EmptyState>
+      ) : (
+        history.map((p) => (
+          <div key={p.id} className="flex flex-wrap items-center gap-2 border-b border-border-soft py-3 last:border-b-0">
+            <span className="font-display text-sm font-semibold [overflow-wrap:anywhere]">{p.name}</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.05em] text-text-muted">{p.week}</span>
+            <span className="ml-auto font-mono text-[13px] font-bold text-accent">+B${p.amount}</span>
+          </div>
+        ))
       )}
     </CollapsiblePanel>
   );

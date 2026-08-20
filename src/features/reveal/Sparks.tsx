@@ -9,16 +9,19 @@ interface Spark {
   delay: number;
 }
 
-const COLORS = ['var(--accent)', 'rgba(240,93,45,.55)', 'var(--text-muted)'];
+const COLORS = ['var(--accent)', 'var(--accent-glow-55)', 'var(--text-muted)'];
+const SPARK_COUNT = 36;
 
 let nextId = 0;
 
-/** A one-shot burst of rising particles, launched once when the winner lands. */
+/** A one-shot burst of rising particles, launched once when the winner lands —
+ * denser than a typical UI flourish since this is standing in for the payoff of
+ * an actual cash bonus, not just a decorative accent. */
 export function Sparks() {
   const [sparks, setSparks] = useState<Spark[]>([]);
 
   useEffect(() => {
-    const created = Array.from({ length: 16 }, () => ({
+    const created = Array.from({ length: SPARK_COUNT }, () => ({
       id: nextId++,
       size: 5 + Math.random() * 7,
       left: 10 + Math.random() * 80,

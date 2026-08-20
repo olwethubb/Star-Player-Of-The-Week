@@ -1,14 +1,26 @@
 import { Suspense } from 'react';
 import { TopBar } from '@/components/layout/TopBar';
-import { LazyPayoutQueuePanel } from '@/features/payouts/PayoutQueuePanel.lazy';
+import { LazyPastWinnersPanel, LazyPayoutQueuePanel } from '@/features/payouts/PayoutQueuePanel.lazy';
 import { LazyManageTeamPanel } from '@/features/team-admin/ManageTeamPanel.lazy';
 import { useSession } from '@/hooks/useSession';
 import { WinnerBlock } from './WinnerBlock';
 import { Scoreboard } from './Scoreboard';
 
 export function ResultsPage() {
-  const { user, me, profiles, settings, myBalance, tally, balances, payoutQueue, isAdmin, canManagePayouts, loadedTally } =
-    useSession();
+  const {
+    user,
+    me,
+    profiles,
+    settings,
+    myBalance,
+    tally,
+    balances,
+    payoutQueue,
+    payoutHistory,
+    isAdmin,
+    canManagePayouts,
+    loadedTally,
+  } = useSession();
 
   if (!user || !me) return null;
 
@@ -31,6 +43,7 @@ export function ResultsPage() {
       )}
       <Suspense fallback={null}>
         {canManagePayouts && <LazyPayoutQueuePanel queue={payoutQueue} resolvedBy={user.uid} />}
+        {canManagePayouts && <LazyPastWinnersPanel history={payoutHistory} />}
         {isAdmin && <LazyManageTeamPanel profiles={profiles} balances={balances} financeUid={settings.financeUid} />}
       </Suspense>
     </>

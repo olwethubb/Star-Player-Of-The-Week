@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { speak } from '@/lib/speech';
+import { useTtsPreference } from '@/hooks/useTtsPreference';
 import type { Profile, Settings } from '@/types/firestore';
 import type { CeremonyPhase } from '@/hooks/useRevealCeremony';
 import { Countdown } from './Countdown';
@@ -21,19 +22,23 @@ function winnerAnnouncement(totalVotes: number, winnerUids: string[], profiles: 
 export function RevealCeremony({
   phase,
   count,
+  spinMs,
   settings,
   profiles,
 }: {
   phase: CeremonyPhase;
   count: number;
+  spinMs: number;
   settings: Settings;
   profiles: Record<string, Profile>;
 }) {
+  const [ttsEnabled] = useTtsPreference();
+
   useEffect(() => {
-    if (phase !== 'landed') return;
+    if (phase !== 'landed' || !ttsEnabled) return;
     speak(winnerAnnouncement(settings.totalVotes, settings.winnerUids, profiles));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [phase, ttsEnabled]);
 
   if (phase === 'countdown') return <Countdown count={count} />;
 
@@ -45,7 +50,7 @@ export function RevealCeremony({
       <h1 className="m-0 mb-6 max-w-[26ch] font-serif text-[clamp(24px,6vw,34px)] font-bold italic leading-[1.15]">
         Revealing the Star Player of the Week
       </h1>
-      <Wheel profiles={profiles} winnerUids={settings.winnerUids} totalVotes={settings.totalVotes}>
+      <Wheel profiles={profiles} winnerUids={settings.winnerUids} totalVotes={settings.totalVotes} spinMs={spinMs}>
         {phase === 'landed' && (
           <WinnerPopup totalVotes={settings.totalVotes} winnerUids={settings.winnerUids} profiles={profiles} />
         )}

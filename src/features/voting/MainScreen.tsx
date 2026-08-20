@@ -1,12 +1,13 @@
 import { Suspense } from 'react';
 import { TopBar } from '@/components/layout/TopBar';
 import { CashoutCard } from '@/features/wallet/CashoutCard';
-import { LazyPayoutQueuePanel } from '@/features/payouts/PayoutQueuePanel.lazy';
+import { LazyPastWinnersPanel, LazyPayoutQueuePanel } from '@/features/payouts/PayoutQueuePanel.lazy';
 import { LazyManageTeamPanel } from '@/features/team-admin/ManageTeamPanel.lazy';
 import { useCastVote } from '@/hooks/useVotingActions';
 import { BONUS_AMOUNT } from '@/lib/constants';
 import { VoteGrid } from './VoteGrid';
 import { SessionControls } from './SessionControls';
+import { VotingProgress } from './VotingProgress';
 import { useSession } from '@/hooks/useSession';
 
 export function MainScreen() {
@@ -18,7 +19,10 @@ export function MainScreen() {
     myVote,
     myBalance,
     balances,
+    tally,
+    loadedTally,
     payoutQueue,
+    payoutHistory,
     myPayout,
     isAdmin,
     canManagePayouts,
@@ -45,6 +49,10 @@ export function MainScreen() {
 
       <CashoutCard uid={user.uid} profile={me} balance={myBalance} myPayout={myPayout} financeName={financeName} />
 
+      {isAdmin && votingOpen && (
+        <VotingProgress tally={tally} loadedTally={loadedTally} teammateCount={Object.keys(profiles).length} />
+      )}
+
       <VoteGrid
         votingOpen={votingOpen}
         isAdmin={isAdmin}
@@ -57,6 +65,7 @@ export function MainScreen() {
       {isAdmin && <SessionControls votingOpen={votingOpen} profiles={profiles} />}
       <Suspense fallback={null}>
         {canManagePayouts && <LazyPayoutQueuePanel queue={payoutQueue} resolvedBy={user.uid} />}
+        {canManagePayouts && <LazyPastWinnersPanel history={payoutHistory} />}
         {isAdmin && <LazyManageTeamPanel profiles={profiles} balances={balances} financeUid={settings.financeUid} />}
       </Suspense>
     </>

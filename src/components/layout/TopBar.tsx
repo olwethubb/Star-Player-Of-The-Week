@@ -2,9 +2,13 @@ import { logout } from '@/services/auth.service';
 import { getWeekLabel } from '@/lib/week';
 import { WalletChip } from '@/components/ui/WalletChip';
 import { Badge } from '@/components/ui/Badge';
+import { IconVolume, IconVolumeOff } from '@/components/ui/Icons';
+import { useTtsPreference } from '@/hooks/useTtsPreference';
 import type { Profile } from '@/types/firestore';
 
 export function TopBar({ me, balance }: { me: Profile; balance: number }) {
+  const [ttsEnabled, toggleTts] = useTtsPreference();
+
   return (
     <>
       <div className="mb-7 flex flex-wrap items-center justify-between gap-2.5">
@@ -21,7 +25,17 @@ export function TopBar({ me, balance }: { me: Profile; balance: number }) {
         {me.role === 'owner' && <Badge variant="owner">Owner</Badge>}
         {me.role === 'admin' && <Badge variant="admin">Admin</Badge>}
         <button
-          className="ml-auto cursor-pointer border-none bg-transparent p-1 text-[13px] text-text-muted underline"
+          type="button"
+          aria-label={ttsEnabled ? 'Mute the reveal announcement' : 'Unmute the reveal announcement'}
+          aria-pressed={ttsEnabled}
+          title={ttsEnabled ? 'Reveal announcement: on' : 'Reveal announcement: muted'}
+          onClick={toggleTts}
+          className="ml-auto flex cursor-pointer items-center justify-center rounded-full border border-border bg-transparent p-1.5 text-text-muted hover:border-accent hover:text-accent"
+        >
+          {ttsEnabled ? <IconVolume /> : <IconVolumeOff />}
+        </button>
+        <button
+          className="cursor-pointer border-none bg-transparent p-1 text-[13px] text-text-muted underline"
           onClick={() => logout()}
         >
           Log out

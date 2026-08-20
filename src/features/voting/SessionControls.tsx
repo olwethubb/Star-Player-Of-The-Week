@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useDoReveal, useSessionControls } from '@/hooks/useVotingActions';
 import type { Profile } from '@/types/firestore';
 
@@ -8,18 +10,23 @@ import type { Profile } from '@/types/firestore';
 export function SessionControls({ votingOpen, profiles }: { votingOpen: boolean; profiles: Record<string, Profile> }) {
   const { start, end, pending: sessionPending } = useSessionControls();
   const { reveal, pending: revealPending } = useDoReveal(profiles);
+  const [confirmingEnd, setConfirmingEnd] = useState(false);
 
   if (votingOpen) {
     return (
-      <Button
-        variant="primary"
-        disabled={sessionPending}
-        onClick={() => {
-          if (confirm('End voting now? Nobody will be able to vote again until you start a new session.')) end();
-        }}
-      >
-        End Voting
-      </Button>
+      <>
+        <Button variant="primary" disabled={sessionPending} onClick={() => setConfirmingEnd(true)}>
+          End Voting
+        </Button>
+        <ConfirmDialog
+          open={confirmingEnd}
+          onOpenChange={setConfirmingEnd}
+          title="End voting now?"
+          description="Nobody will be able to vote again until you start a new session."
+          confirmLabel="End Voting"
+          onConfirm={end}
+        />
+      </>
     );
   }
 

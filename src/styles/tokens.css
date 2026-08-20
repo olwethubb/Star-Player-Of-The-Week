@@ -8,4 +8,6 @@
   --border-soft: rgba(245, 239, 227, 0.08);
   --accent: #f05d2d;
   --accent-contrast: #241205;
+  --accent-glow-35: color-mix(in srgb, var(--accent) 35%, transparent);
+  --accent-glow-55: color-mix(in srgb, var(--accent) 55%, transparent);
 }

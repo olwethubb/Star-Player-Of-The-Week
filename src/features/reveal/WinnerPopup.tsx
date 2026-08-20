@@ -33,9 +33,12 @@ export function WinnerPopup({
   }
 
   return (
+    // Static, in-flow below the wheel on narrow screens (so it never overlaps the
+    // trophy hub/pointer there); only from `sm:` up does it become the classic
+    // absolute-centered overlay, where there's enough room for it to sit on top.
     <div
-      className={`absolute left-1/2 top-1/2 z-[5] max-w-[88%] -translate-x-1/2 -translate-y-1/2 rounded-[20px] border-[3px] border-accent bg-bg-card px-7 py-5 text-center shadow-[0_12px_44px_rgba(0,0,0,.6)] transition-[transform,opacity] duration-500 [transition-timing-function:cubic-bezier(.34,1.56,.64,1)] ${
-        shown ? 'scale-100 opacity-100' : 'scale-0 opacity-0'
+      className={`relative z-[5] mx-auto mt-4 max-w-[92%] rounded-[20px] border-[3px] border-accent bg-bg-card px-6 py-4 text-center shadow-[0_12px_44px_rgba(0,0,0,.6)] transition-[transform,opacity] duration-500 [transition-timing-function:cubic-bezier(.34,1.56,.64,1)] sm:absolute sm:left-1/2 sm:top-1/2 sm:mt-0 sm:max-w-[88%] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:px-7 sm:py-5 ${
+        shown ? 'scale-100 opacity-100' : 'scale-95 opacity-0 sm:scale-0'
       }`}
     >
       <p className="m-0 mb-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-accent">{label}</p>

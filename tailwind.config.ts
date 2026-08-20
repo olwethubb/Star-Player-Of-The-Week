@@ -19,7 +19,7 @@ export default {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         display: ['"Space Grotesk"', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
-        serif: ['Georgia', '"Iowan Old Style"', '"Times New Roman"', 'serif'],
+        serif: ['Fraunces', 'Georgia', '"Iowan Old Style"', '"Times New Roman"', 'serif'],
       },
       boxShadow: {
         card: '0 1px 2px rgba(0,0,0,0.35), 0 8px 30px rgba(0,0,0,0.5)',

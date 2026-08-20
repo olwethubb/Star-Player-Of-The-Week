@@ -1,5 +1,5 @@
 import { onAuthStateChanged } from 'firebase/auth';
-import { onSnapshot, query, where } from 'firebase/firestore';
+import { limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   auth,
@@ -7,6 +7,7 @@ import {
   balancesCol,
   myVoteRef,
   payoutRequestsCol,
+  payoutsCol,
   profilesCol,
   settingsRef,
   tallyCol,
@@ -15,7 +16,7 @@ import { canManagePayouts as computeCanManagePayouts, DEFAULT_SETTINGS, isAdmin 
 import type { Profile, Settings } from '@/types/firestore';
 import { getWeekKey } from '@/lib/week';
 import { rollWeek } from '@/services/voting.service';
-import { SessionContext, type PayoutRequestWithId, type SessionState } from './SessionContext';
+import { SessionContext, type PayoutRequestWithId, type PayoutWithId, type SessionState } from './SessionContext';
 import type { User } from 'firebase/auth';
 
 function handleErr(setLoadError: (msg: string) => void) {
@@ -53,6 +54,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const [payoutQueue, setPayoutQueue] = useState<PayoutRequestWithId[]>([]);
   const [myPayout, setMyPayout] = useState<PayoutRequestWithId | null>(null);
+  const [payoutHistory, setPayoutHistory] = useState<PayoutWithId[]>([]);
 
   const [loadErrorMsg, setLoadErrorMsg] = useState<string | null>(null);
   const onErr = handleErr(setLoadErrorMsg);
@@ -165,11 +167,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedProfiles, loadedSettings, admin]);
 
-  // Only admins ever subscribe to the tally, and only once revealed — everyone else
-  // just reads settings.winnerUids/totalVotes, which never expose per-person data.
+  // Only admins ever subscribe to the tally — everyone else just reads
+  // settings.winnerUids/totalVotes, which never exposes per-person data. Admins get
+  // it both once revealed (the Scoreboard breakdown) AND while voting is still open
+  // (so MainScreen can show a live "X votes cast so far" count to help them judge
+  // when it's worth ending voting) — firestore.rules already permits admin reads of
+  // this collection at any time; this is just the app choosing to use it earlier too.
   useEffect(() => {
     if (!loadedProfiles || !loadedSettings) return;
-    if (!(settings.revealed && admin)) {
+    if (!(admin && (settings.revealed || settings.votingOpen))) {
       setTally({});
       setLoadedTally(false);
       return;
@@ -187,7 +193,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     );
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadedProfiles, loadedSettings, settings.revealed, admin]);
+  }, [loadedProfiles, loadedSettings, settings.revealed, settings.votingOpen, admin]);
 
   // Only the assigned finance person (or an admin) ever sees the full payout queue.
   useEffect(() => {
@@ -202,6 +208,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
         list.sort((a, b) => (a.status === 'pending' ? 0 : 1) - (b.status === 'pending' ? 0 : 1));
         setPayoutQueue(list);
+      },
+      onErr,
+    );
+    return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedProfiles, loadedSettings, canManage]);
+
+  // Recent payout history (winner bonuses + tie awards) — same audience as the
+  // payout-request queue above (admin or the assigned finance holder).
+  useEffect(() => {
+    if (!loadedProfiles || !loadedSettings || !canManage) {
+      setPayoutHistory([]);
+      return;
+    }
+    const unsub = onSnapshot(
+      query(payoutsCol, orderBy('ts', 'desc'), limit(25)),
+      (snap) => {
+        const list: PayoutWithId[] = [];
+        snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
+        setPayoutHistory(list);
       },
       onErr,
     );
@@ -237,6 +263,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     balances,
     payoutQueue,
     myPayout,
+    payoutHistory,
     loadedProfiles,
     loadedSettings,
     loadedMyVote,

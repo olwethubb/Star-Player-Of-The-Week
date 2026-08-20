@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useTeamActions } from '@/hooks/useTeamActions';
 import type { Profile } from '@/types/firestore';
 
@@ -12,6 +15,7 @@ interface MemberRowProps {
 
 export function MemberRow({ uid, profile, balance, holdsFinance, actions }: MemberRowProps) {
   const isOwnerRow = profile.role === 'owner';
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
 
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-border-soft py-3 last:border-b-0">
@@ -35,30 +39,28 @@ export function MemberRow({ uid, profile, balance, holdsFinance, actions }: Memb
           className="min-h-[38px] w-[76px] rounded-lg border border-border bg-bg-card px-2 py-2 font-mono text-[13px] text-text focus:border-accent focus:outline-none"
         />
         {!isOwnerRow && (
-          <button
-            className="min-h-9 cursor-pointer whitespace-nowrap rounded-full border border-border bg-transparent px-3 py-2 text-xs text-text hover:border-accent hover:text-accent"
-            onClick={() => actions.setRole(uid, profile.role === 'admin' ? 'member' : 'admin')}
-          >
+          <Button variant="small" onClick={() => actions.setRole(uid, profile.role === 'admin' ? 'member' : 'admin')}>
             {profile.role === 'admin' ? 'Remove admin' : 'Make admin'}
-          </button>
+          </Button>
         )}
-        <button
-          className="min-h-9 cursor-pointer whitespace-nowrap rounded-full border border-border bg-transparent px-3 py-2 text-xs text-text hover:border-accent hover:text-accent"
-          onClick={() => actions.setFinanceHolder(uid)}
-        >
+        <Button variant="small" onClick={() => actions.setFinanceHolder(uid)}>
           {holdsFinance ? 'Remove finance' : 'Make finance'}
-        </button>
+        </Button>
         {!isOwnerRow && (
-          <button
-            className="min-h-9 cursor-pointer whitespace-nowrap rounded-full border border-border bg-transparent px-3 py-2 text-xs text-text hover:border-red-500 hover:text-red-500"
-            onClick={() => {
-              if (confirm(`Remove ${profile.name} from the team? They'll lose access immediately.`)) {
-                actions.removeTeammate(uid);
-              }
-            }}
-          >
-            Remove
-          </button>
+          <>
+            <Button variant="danger" onClick={() => setConfirmingRemove(true)}>
+              Remove
+            </Button>
+            <ConfirmDialog
+              open={confirmingRemove}
+              onOpenChange={setConfirmingRemove}
+              title={`Remove ${profile.name}?`}
+              description="They'll lose access to the app immediately."
+              confirmLabel="Remove"
+              danger
+              onConfirm={() => actions.removeTeammate(uid)}
+            />
+          </>
         )}
       </div>
     </div>

@@ -4,3 +4,7 @@ import { lazy } from 'react';
 export const LazyPayoutQueuePanel = lazy(() =>
   import('./PayoutQueuePanel').then((m) => ({ default: m.PayoutQueuePanel })),
 );
+
+export const LazyPastWinnersPanel = lazy(() =>
+  import('./PayoutQueuePanel').then((m) => ({ default: m.PastWinnersPanel })),
+);

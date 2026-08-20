@@ -56,6 +56,37 @@ export function IconEye(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function IconUsers(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" strokeWidth={2} {...base} {...props}>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+      <path d="M16.5 5.5a3.5 3.5 0 0 1 0 6.9" />
+      <path d="M21.5 20a5.5 5.5 0 0 0-4.5-6.3" />
+    </svg>
+  );
+}
+
+export function IconVolume(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" strokeWidth={2} {...base} {...props}>
+      <path d="M4 9v6h4l5 4V5L8 9H4Z" />
+      <path d="M17 8a5 5 0 0 1 0 8" />
+      <path d="M19.5 5.5a9 9 0 0 1 0 13" />
+    </svg>
+  );
+}
+
+export function IconVolumeOff(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" strokeWidth={2} {...base} {...props}>
+      <path d="M4 9v6h4l5 4V5L8 9H4Z" />
+      <path d="M17 9l5 6" />
+      <path d="M22 9l-5 6" />
+    </svg>
+  );
+}
+
 export function IconEyeOff(props: SVGProps<SVGSVGElement>) {
   return (
     <svg width={16} height={16} viewBox="0 0 24 24" strokeWidth={2} {...base} {...props}>

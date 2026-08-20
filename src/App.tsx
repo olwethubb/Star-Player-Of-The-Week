@@ -22,7 +22,7 @@ export function App() {
   if (session.authResolving) {
     return (
       <AppShell>
-        <Spinner />
+        <Spinner label="Checking your session" />
       </AppShell>
     );
   }
@@ -41,7 +41,7 @@ export function App() {
   if (!loaded) {
     return (
       <AppShell>
-        <Spinner errorMsg={session.loadErrorMsg} />
+        <Spinner label="Loading your data" errorMsg={session.loadErrorMsg} />
       </AppShell>
     );
   }
@@ -65,7 +65,13 @@ export function App() {
   if (ceremony.pending && ceremony.phase) {
     return (
       <AppShell>
-        <RevealCeremony phase={ceremony.phase} count={ceremony.count} settings={session.settings} profiles={session.profiles} />
+        <RevealCeremony
+          phase={ceremony.phase}
+          count={ceremony.count}
+          spinMs={ceremony.spinMs}
+          settings={session.settings}
+          profiles={session.profiles}
+        />
       </AppShell>
     );
   }
@@ -73,7 +79,7 @@ export function App() {
   if (session.settings.revealed && session.isAdmin && !session.loadedTally) {
     return (
       <AppShell>
-        <Spinner />
+        <Spinner label="Loading results" />
       </AppShell>
     );
   }

@@ -1,8 +1,12 @@
 import { createContext } from 'react';
-import type { PayoutRequest, Profile, Settings } from '@/types/firestore';
+import type { Payout, PayoutRequest, Profile, Settings } from '@/types/firestore';
 import type { User } from 'firebase/auth';
 
 export interface PayoutRequestWithId extends PayoutRequest {
+  id: string;
+}
+
+export interface PayoutWithId extends Payout {
   id: string;
 }
 
@@ -27,6 +31,9 @@ export interface SessionState {
   balances: Record<string, number>;
   payoutQueue: PayoutRequestWithId[];
   myPayout: PayoutRequestWithId | null;
+  /** Recent past bonus payouts (winners + tie awards) — admin/finance only, same
+   * audience as `payoutQueue`; empty for everyone else. */
+  payoutHistory: PayoutWithId[];
   loadedProfiles: boolean;
   loadedSettings: boolean;
   loadedMyVote: boolean;

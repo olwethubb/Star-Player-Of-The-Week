@@ -1,4 +1,4 @@
-import { IconCheck, IconLock } from '@/components/ui/Icons';
+import { IconCheck, IconLock, IconUsers } from '@/components/ui/Icons';
 import { EmptyState } from '@/components/ui/EmptyState';
 import type { Profile } from '@/types/firestore';
 
@@ -23,14 +23,14 @@ interface VoteGridProps {
 export function VoteGrid({ votingOpen, isAdmin, others, myVote, pendingUid, onVote }: VoteGridProps) {
   if (!votingOpen) {
     return (
-      <EmptyState>
+      <EmptyState icon={<IconLock />}>
         Voting hasn't opened yet this week.{' '}
         {isAdmin ? 'Click "Start Voting" below when you\'re ready.' : 'Check back once an admin opens it.'}
       </EmptyState>
     );
   }
   if (others.length === 0) {
-    return <EmptyState>Add more teammates below before voting can start.</EmptyState>;
+    return <EmptyState icon={<IconUsers />}>Add more teammates below before voting can start.</EmptyState>;
   }
 
   return (

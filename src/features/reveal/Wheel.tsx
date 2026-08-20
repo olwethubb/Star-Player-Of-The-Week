@@ -6,18 +6,29 @@ interface WheelProps {
   profiles: Record<string, Profile>;
   winnerUids: string[];
   totalVotes: number;
+  /** How long the spin transition should take — shorter under prefers-reduced-motion
+   * (see useRevealCeremony), so the wheel settles with a brief crossfade instead of
+   * either a full spin or an instant, disorienting jump. */
+  spinMs: number;
   children?: ReactNode;
 }
 
 const EXTRA_SPINS = 6;
 const WHEEL_COLORS = ['var(--bg-card)', 'var(--bg-elevated)'];
+// Past this many wedges, labels switch to a smaller, tighter font so names stay
+// legible instead of overrunning their neighbors.
+const DENSE_ROSTER_THRESHOLD = 14;
 
 /** The reveal wheel's rotation is set imperatively via refs, deliberately outside React
  * state. The wedges/labels are memoized from props that never change mid-spin, so no
  * unrelated re-render (a payout/balance snapshot landing mid-ceremony) ever touches this
  * subtree or resets the in-flight CSS transition. Making the rotation reactive would risk
- * exactly that regression — the bug this component exists to avoid (see commit e51256c). */
-export function Wheel({ profiles, winnerUids, totalVotes, children }: WheelProps) {
+ * exactly that regression — the bug this component exists to avoid (see commit e51256c).
+ *
+ * Both the wheel and its labels carry `motion-exempt` (see globals.css) so they drive
+ * their own transition duration via `spinMs` instead of being collapsed to near-zero by
+ * the blanket prefers-reduced-motion rule that governs everything else in the app. */
+export function Wheel({ profiles, winnerUids, totalVotes, spinMs, children }: WheelProps) {
   const wheelRef = useRef<HTMLDivElement>(null);
   const labelRefs = useRef<(HTMLSpanElement | null)[]>([]);
 
@@ -26,6 +37,7 @@ export function Wheel({ profiles, winnerUids, totalVotes, children }: WheelProps
     [profiles],
   );
   const wedge = 360 / Math.max(names.length, 1);
+  const dense = names.length > DENSE_ROSTER_THRESHOLD;
 
   const bgStops = useMemo(
     () => names.map((_, i) => `${WHEEL_COLORS[i % 2]} ${i * wedge}deg ${(i + 1) * wedge}deg`).join(', '),
@@ -79,8 +91,8 @@ export function Wheel({ profiles, winnerUids, totalVotes, children }: WheelProps
       />
       <div
         ref={wheelRef}
-        className="absolute inset-0 overflow-hidden rounded-full border-[5px] border-accent shadow-card transition-transform duration-[5000ms] [transition-timing-function:cubic-bezier(.1,.7,.15,1)]"
-        style={{ background: `conic-gradient(from 0deg, ${bgStops})` }}
+        className="motion-exempt absolute inset-0 overflow-hidden rounded-full border-[5px] border-accent shadow-card transition-transform [transition-timing-function:cubic-bezier(.1,.7,.15,1)]"
+        style={{ background: `conic-gradient(from 0deg, ${bgStops})`, transitionDuration: `${spinMs}ms` }}
       >
         {names.map(([uid, p], i) => (
           <span
@@ -88,8 +100,10 @@ export function Wheel({ profiles, winnerUids, totalVotes, children }: WheelProps
             ref={(el) => {
               labelRefs.current[i] = el;
             }}
-            className="absolute max-w-[30%] -translate-x-1/2 -translate-y-1/2 text-center font-display text-[clamp(10px,2.2vw,15px)] font-bold leading-tight text-text [text-shadow:0_1px_3px_rgba(0,0,0,.5)] transition-transform duration-[5000ms] [transition-timing-function:cubic-bezier(.1,.7,.15,1)]"
-            style={{ left: `${labelPositions[i]?.x}%`, top: `${labelPositions[i]?.y}%` }}
+            className={`motion-exempt absolute line-clamp-2 max-w-[28%] -translate-x-1/2 -translate-y-1/2 overflow-hidden text-center font-display font-bold leading-tight text-text [text-shadow:0_1px_3px_rgba(0,0,0,.5)] transition-transform [transition-timing-function:cubic-bezier(.1,.7,.15,1)] ${
+              dense ? 'text-[clamp(8px,1.6vw,11px)]' : 'text-[clamp(10px,2.2vw,15px)]'
+            }`}
+            style={{ left: `${labelPositions[i]?.x}%`, top: `${labelPositions[i]?.y}%`, transitionDuration: `${spinMs}ms` }}
           >
             {p.name}
           </span>

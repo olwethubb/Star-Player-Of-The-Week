@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Field } from '@/components/ui/Field';
 import { useToast } from '@/hooks/useToast';
 import { useCancelCashout, useRequestCashout } from '@/hooks/usePayoutActions';
 import type { PayoutRequestWithId } from '@/context/SessionContext';
@@ -14,6 +17,7 @@ interface CashoutCardProps {
 
 export function CashoutCard({ uid, profile, balance, myPayout, financeName }: CashoutCardProps) {
   const [amountInput, setAmountInput] = useState('');
+  const [pendingAmount, setPendingAmount] = useState<number | null>(null);
   const { notify } = useToast();
   const { requestCashout, pending } = useRequestCashout(uid, profile, !!myPayout, balance);
   const cancelCashout = useCancelCashout();
@@ -28,12 +32,9 @@ export function CashoutCard({ uid, profile, balance, myPayout, financeName }: Ca
         <div className="mb-2.5 text-[13px] text-text-muted">
           Cash-out of B${myPayout.amount} requested — awaiting review
         </div>
-        <button
-          className="min-h-9 cursor-pointer rounded-full border border-border bg-transparent px-3 py-2 text-xs text-text hover:border-accent hover:text-accent"
-          onClick={() => cancelCashout(myPayout.id)}
-        >
+        <Button variant="small" onClick={() => cancelCashout(myPayout.id)}>
           Cancel request
-        </button>
+        </Button>
       </div>
     );
   }
@@ -50,10 +51,7 @@ export function CashoutCard({ uid, profile, balance, myPayout, financeName }: Ca
       notify(`You only have B$${balance || 0} available.`);
       return;
     }
-    if (confirm(`Request a cash-out of B$${amount}?${financeName ? ` ${financeName} will review it.` : ''}`)) {
-      requestCashout(amount);
-      setAmountInput('');
-    }
+    setPendingAmount(amount);
   }
 
   return (
@@ -62,26 +60,38 @@ export function CashoutCard({ uid, profile, balance, myPayout, financeName }: Ca
         <span className="text-[13px] text-text-muted">Your balance</span>
         <span className="font-mono text-lg font-bold">B${(balance || 0).toLocaleString()}</span>
       </div>
-      <div className="flex gap-2">
-        <input
-          type="number"
-          min={1}
-          max={balance}
-          step={1}
-          inputMode="numeric"
-          placeholder="Amount"
-          value={amountInput}
-          onChange={(e) => setAmountInput(e.target.value)}
-          className="min-h-11 min-w-0 flex-1 rounded-[10px] border border-border bg-bg-elevated px-3 py-2.5 font-mono text-base text-text focus:border-accent focus:outline-none"
-        />
-        <button
-          disabled={pending}
-          onClick={handleSubmit}
-          className="min-h-[46px] cursor-pointer whitespace-nowrap rounded-full border border-border bg-transparent px-5 py-3 text-sm font-semibold text-text hover:border-accent hover:text-accent disabled:opacity-60"
-        >
+      <div className="flex items-end gap-2">
+        <div className="min-w-0 flex-1">
+          <Field
+            label="Amount to cash out"
+            type="number"
+            min={1}
+            max={balance}
+            step={1}
+            inputMode="numeric"
+            placeholder="0"
+            value={amountInput}
+            onChange={(e) => setAmountInput(e.target.value)}
+          />
+        </div>
+        <Button variant="ghost" disabled={pending} onClick={handleSubmit}>
           Cash Out
-        </button>
+        </Button>
       </div>
+      <ConfirmDialog
+        open={pendingAmount !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingAmount(null);
+        }}
+        title="Request this cash-out?"
+        description={`B$${pendingAmount ?? 0} will be requested.${financeName ? ` ${financeName} will review it.` : ''}`}
+        confirmLabel="Request cash-out"
+        onConfirm={() => {
+          if (pendingAmount != null) requestCashout(pendingAmount);
+          setAmountInput('');
+          setPendingAmount(null);
+        }}
+      />
     </div>
   );
 }
