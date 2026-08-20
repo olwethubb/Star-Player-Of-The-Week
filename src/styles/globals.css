@@ -159,58 +159,30 @@
   z-index: 1;
 }
 
-/* Full-page backdrop for the gate/auth screens: one black-to-orange-to-white sweep
-   behind both panels, rather than each panel carrying its own flat/gradient fill.
-   Direction/stops differ by layout: stacked on mobile, the brand text sits in the
-   first ~40% of the page's total height, so the sweep is held off until 72% (comfortably
-   inside the card section below); once the two-column split kicks in at lg, the split
-   itself keeps text clear of the sweep so it can run left-to-right at even thirds. */
+/* Full-page backdrop for the gate/auth screens: a single 360° sweep pivoting on the
+   top-right corner (where the sunburst sits) — white right at the corner, through
+   orange, settling into dark for the rest of the page. Angle-based, not
+   percentage-of-dimension, so it holds up unchanged across any aspect ratio —
+   no per-breakpoint tuning needed. */
 .gate-shell-gradient {
-  background: linear-gradient(
-    to bottom,
-    var(--text) 0%,
-    var(--text) 72%,
-    var(--accent) 85%,
-    #ffffff 95%,
-    #ffffff 100%
-  );
-}
-@media (min-width: 1024px) {
-  .gate-shell-gradient {
-    background: linear-gradient(
-      to right,
-      var(--text) 0%,
-      var(--text) 32%,
-      var(--accent) 50%,
-      #ffffff 68%,
-      #ffffff 100%
-    );
-  }
+  background: conic-gradient(from 180deg at 100% 0%, #ffffff 0deg, var(--accent) 15deg, var(--text) 35deg, var(--text) 90deg);
 }
 
-/* The sunburst now bleeds across the whole screen instead of being clipped inside
-   one panel. Rays are rendered light so they read against the black AND orange
-   bands, then naturally disappear once they cross into the white band. Centered on
-   wherever the orange band actually falls for each layout. */
+/* The sunburst lives in the top-right corner again, matching where the gradient's
+   white/orange hot spot sits, instead of bleeding across the whole screen. */
 .gate-rays::before {
   content: '';
   position: absolute;
-  top: 80%;
-  left: 50%;
-  width: 120vmax;
+  top: -12%;
+  right: -12%;
+  width: 65vmax;
   aspect-ratio: 1;
-  transform: translate(-50%, -50%);
   background: repeating-conic-gradient(from 10deg, #fff8f0 0deg 1.6deg, transparent 1.6deg 11deg);
-  opacity: 0.32;
-  /* Hollow centre and a tight outer fade: the burst stays concentrated around the
-     orange band instead of bleeding out far enough to cut across the panel text. */
-  -webkit-mask-image: radial-gradient(circle, transparent 5%, black 16%, transparent 38%);
-  mask-image: radial-gradient(circle, transparent 5%, black 16%, transparent 38%);
+  opacity: 0.5;
+  /* Hollow centre: the mask's inner stop keeps the convergence point empty, so the
+     rays read as a burst rather than a hard bright dot. */
+  -webkit-mask-image: radial-gradient(circle, transparent 6%, black 20%, transparent 62%);
+  mask-image: radial-gradient(circle, transparent 6%, black 20%, transparent 62%);
   pointer-events: none;
   z-index: 0;
-}
-@media (min-width: 1024px) {
-  .gate-rays::before {
-    top: 50%;
-  }
 }
