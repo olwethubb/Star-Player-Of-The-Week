@@ -39,7 +39,7 @@ export function GateEyebrow({ children }: { children: ReactNode }) {
 export function GateHeading({ children, wide }: { children: ReactNode; wide?: boolean }) {
   return (
     <h1
-      className={`mx-auto mb-4 mt-0 text-center font-serif text-[clamp(28px,4.2vw,44px)] font-bold italic leading-[1.08] text-on-dark [text-wrap:balance] ${
+      className={`mx-auto mb-4 mt-0 text-center font-serif text-[clamp(22px,4.2vw,36px)] font-bold italic leading-[1.08] text-on-dark [text-wrap:balance] ${
         wide ? 'max-w-[26ch]' : 'max-w-[18ch]'
       }`}
     >
