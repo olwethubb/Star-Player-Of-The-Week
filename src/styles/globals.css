@@ -137,31 +137,6 @@
   animation-fill-mode: forwards;
 }
 
-/* The logo's own bomb-sprouting-a-plant illustration, reused as a "moment"
-   accent (pre-login gate, winner reveal). Plain CSS conic-gradient, not artwork. */
-.burst {
-  position: relative;
-  overflow: hidden;
-}
-.burst::before {
-  content: '';
-  position: absolute;
-  top: -160px;
-  right: -160px;
-  width: 460px;
-  height: 460px;
-  border-radius: 50%;
-  background: repeating-conic-gradient(from 8deg, var(--accent) 0deg 2.2deg, transparent 2.2deg 15deg);
-  opacity: 0.85;
-  -webkit-mask-image: radial-gradient(circle, black 35%, transparent 72%);
-  mask-image: radial-gradient(circle, black 35%, transparent 72%);
-  pointer-events: none;
-}
-.burst > * {
-  position: relative;
-  z-index: 1;
-}
-
 /* Full-page backdrop for the gate/auth screens: a soft warm glow behind a single
    centered glass card. */
 .gate-dark-bg {

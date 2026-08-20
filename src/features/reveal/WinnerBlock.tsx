@@ -58,7 +58,7 @@ export function WinnerBlock({
   if (winnerUids.length === 1) {
     const winner = profiles[winnerUids[0]!];
     return (
-      <div className="burst mb-[26px] animate-reveal-in rounded-[20px] border border-border bg-bg-card px-5 py-[34px] text-center shadow-card">
+      <div className="mb-[26px] animate-reveal-in rounded-[20px] border border-border bg-bg-card px-5 py-[34px] text-center shadow-card">
         <TrophyHeader />
         <p className="m-0 mb-1.5 font-display text-[clamp(22px,6vw,32px)] font-bold [overflow-wrap:anywhere]">
           {winner?.name ?? 'Unknown'}
@@ -73,7 +73,7 @@ export function WinnerBlock({
 
   return (
     <>
-      <div className="burst mb-[26px] animate-reveal-in rounded-[20px] border border-border bg-bg-card px-5 py-[34px] text-center shadow-card">
+      <div className="mb-[26px] animate-reveal-in rounded-[20px] border border-border bg-bg-card px-5 py-[34px] text-center shadow-card">
         <TrophyHeader />
         <p className="m-0 mb-1.5 font-display text-[clamp(22px,6vw,32px)] font-bold">It's a tie</p>
         <p className="m-0 font-mono text-xs uppercase tracking-[0.05em] text-text-muted [overflow-wrap:anywhere]">
