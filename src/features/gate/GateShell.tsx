@@ -39,7 +39,7 @@ export function GateEyebrow({ children }: { children: ReactNode }) {
 export function GateHeading({ children, wide }: { children: ReactNode; wide?: boolean }) {
   return (
     <h1
-      className={`m-0 mb-4 text-center font-serif text-[clamp(28px,4.2vw,44px)] font-bold italic leading-[1.08] text-on-dark [text-wrap:balance] ${
+      className={`mx-auto mb-4 mt-0 text-center font-serif text-[clamp(28px,4.2vw,44px)] font-bold italic leading-[1.08] text-on-dark [text-wrap:balance] ${
         wide ? 'max-w-[26ch]' : 'max-w-[18ch]'
       }`}
     >
@@ -49,7 +49,9 @@ export function GateHeading({ children, wide }: { children: ReactNode; wide?: bo
 }
 
 export function GateBody({ children }: { children: ReactNode }) {
-  return <p className="m-0 max-w-[38ch] text-center text-[15px] leading-[1.65] text-on-dark-muted">{children}</p>;
+  return (
+    <p className="mx-auto my-0 max-w-[38ch] text-center text-[15px] leading-[1.65] text-on-dark-muted">{children}</p>
+  );
 }
 
 export function GateActions({ children }: { children: ReactNode }) {
