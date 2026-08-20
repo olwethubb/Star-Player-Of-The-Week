@@ -2,7 +2,7 @@ import { auth } from '@/lib/firebase';
 import { logout, resendVerificationEmail } from '@/services/auth.service';
 import { useToast } from '@/hooks/useToast';
 import { Button } from '@/components/ui/Button';
-import { GateActions, GateBody, GateHeading, GateLink, GateLogo, GateShell } from './GateShell';
+import { GateActions, GateBody, GateHeading, GateLink, GateLinks, GateShell } from './GateShell';
 import type { User } from 'firebase/auth';
 
 export function VerifyEmailScreen({ user, onRefresh }: { user: User; onRefresh: () => Promise<void> }) {
@@ -24,22 +24,33 @@ export function VerifyEmailScreen({ user, onRefresh }: { user: User; onRefresh: 
   }
 
   return (
-    <GateShell>
-      <GateLogo />
-      <GateHeading>Verify your email</GateHeading>
-      <GateBody>
-        We sent a link to <strong className="text-text">{user.email}</strong>. Click it, then come back here and
-        continue.
-      </GateBody>
+    <GateShell
+      brand={
+        <>
+          <GateHeading>Verify your email</GateHeading>
+          <GateBody>
+            We sent a link to <strong className="font-semibold text-on-dark">{user.email}</strong>. Click it, then come
+            back here and continue.
+          </GateBody>
+        </>
+      }
+    >
+      <p className="m-0 mb-6 text-sm leading-relaxed text-text-muted">
+        Already clicked the link? Continue below and we'll re-check.
+      </p>
       <GateActions>
         <Button variant="gate" onClick={handleRefresh}>
           I've verified — continue
         </Button>
-        <Button variant="ghost" onClick={handleResend}>
+        <Button variant="ghost" className="w-full" onClick={handleResend}>
           Resend email
         </Button>
       </GateActions>
-      <GateLink onClick={() => logout()}>Log out</GateLink>
+      <GateLinks>
+        <GateLink subtle onClick={() => logout()}>
+          Log out
+        </GateLink>
+      </GateLinks>
     </GateShell>
   );
 }

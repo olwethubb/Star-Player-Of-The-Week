@@ -14,6 +14,8 @@ export default {
         'border-soft': 'var(--border-soft)',
         accent: 'var(--accent)',
         'accent-contrast': 'var(--accent-contrast)',
+        'on-dark': 'var(--on-dark)',
+        'on-dark-muted': 'var(--on-dark-muted)',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

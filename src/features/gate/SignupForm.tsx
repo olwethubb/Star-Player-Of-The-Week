@@ -4,7 +4,7 @@ import { friendlyError } from '@/lib/errors';
 import { SIGNUP_EMAIL_DOMAIN } from '@/lib/constants';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
-import { GateBody, GateHeading, GateLink, GateLogo, GateShell } from './GateShell';
+import { GateBody, GateHeading, GateLink, GateLinks, GateShell } from './GateShell';
 
 const SIGNUP_ERROR_MAP: Record<string, string> = {
   'auth/email-already-in-use': 'An account with that email already exists — try logging in instead.',
@@ -54,13 +54,21 @@ export function SignupForm({ onLogin, onBack }: { onLogin: () => void; onBack: (
   }
 
   return (
-    <GateShell>
-      <GateLogo />
-      <GateHeading>Create your account</GateHeading>
-      <GateBody>
-        Sign up with your {SIGNUP_EMAIL_DOMAIN} email to vote. You'll need to verify it before you can vote.
-      </GateBody>
-      {error && <p className="mb-3.5 min-h-[1px] text-[13px] text-accent">{error}</p>}
+    <GateShell
+      brand={
+        <>
+          <GateHeading wide>Create your account</GateHeading>
+          <GateBody>
+            Sign up with your {SIGNUP_EMAIL_DOMAIN} email to vote. You'll need to verify it before you can vote.
+          </GateBody>
+        </>
+      }
+    >
+      {error && (
+        <p role="alert" className="m-0 mb-4 rounded-xl border border-accent/40 bg-accent/5 px-3.5 py-2.5 text-[13px] text-text">
+          {error}
+        </p>
+      )}
       <form onSubmit={handleSubmit}>
         <Field label="Full name" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} />
         <Field
@@ -91,12 +99,18 @@ export function SignupForm({ onLogin, onBack }: { onLogin: () => void; onBack: (
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
         />
-        <Button type="submit" variant="gate" disabled={submitting}>
-          {submitting ? 'Creating account…' : 'Sign up'}
-        </Button>
+        <div className="mt-2">
+          <Button type="submit" variant="gate" disabled={submitting}>
+            {submitting ? 'Creating account…' : 'Sign up'}
+          </Button>
+        </div>
       </form>
-      <GateLink onClick={onLogin}>Already have an account? Log in</GateLink>
-      <GateLink onClick={onBack}>‹ Back</GateLink>
+      <GateLinks>
+        <GateLink onClick={onLogin}>Already have an account? Log in</GateLink>
+        <GateLink subtle onClick={onBack}>
+          ‹ Back
+        </GateLink>
+      </GateLinks>
     </GateShell>
   );
 }

@@ -27,14 +27,16 @@ export function App() {
     );
   }
 
+  // Gate screens render OUTSIDE AppShell: they're a full-bleed two-panel layout, and
+  // AppShell's max-w-[820px] column (right for the logged-in app) would cage them.
   if (!session.user) {
-    return (
-      <AppShell>
-        {gateMode === 'login' && <LoginForm onSignup={() => setGateMode('signup')} onBack={() => setGateMode('gate')} />}
-        {gateMode === 'signup' && <SignupForm onLogin={() => setGateMode('login')} onBack={() => setGateMode('gate')} />}
-        {gateMode === 'gate' && <Gate onVote={() => setGateMode('login')} onSignup={() => setGateMode('signup')} />}
-      </AppShell>
-    );
+    if (gateMode === 'login') {
+      return <LoginForm onSignup={() => setGateMode('signup')} onBack={() => setGateMode('gate')} />;
+    }
+    if (gateMode === 'signup') {
+      return <SignupForm onLogin={() => setGateMode('login')} onBack={() => setGateMode('gate')} />;
+    }
+    return <Gate onVote={() => setGateMode('login')} onSignup={() => setGateMode('signup')} />;
   }
 
   const loaded = session.loadedProfiles && session.loadedSettings && session.loadedMyVote && session.loadedMyBalance;
@@ -47,19 +49,11 @@ export function App() {
   }
 
   if (!session.me) {
-    return (
-      <AppShell>
-        <NoAccessScreen />
-      </AppShell>
-    );
+    return <NoAccessScreen />;
   }
 
   if (session.me.selfSignup && !session.user.emailVerified) {
-    return (
-      <AppShell>
-        <VerifyEmailScreen user={session.user} onRefresh={session.refreshUser} />
-      </AppShell>
-    );
+    return <VerifyEmailScreen user={session.user} onRefresh={session.refreshUser} />;
   }
 
   if (ceremony.pending && ceremony.phase) {

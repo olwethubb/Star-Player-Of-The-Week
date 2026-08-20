@@ -8,6 +8,10 @@
   --border-soft: rgba(32, 26, 20, 0.06);
   --accent: #ff5a1f;
   --accent-contrast: #241205;
+  /* Text sitting on a dark panel (the gate screen's brand half), where the normal
+     --text/--text-muted pair would be invisible. */
+  --on-dark: #fff8f0;
+  --on-dark-muted: rgba(255, 248, 240, 0.74);
   --accent-glow-35: color-mix(in srgb, var(--accent) 35%, transparent);
   --accent-glow-55: color-mix(in srgb, var(--accent) 55%, transparent);
   /* The reveal wheel's alternating wedge colors are their own tokens, not aliases of

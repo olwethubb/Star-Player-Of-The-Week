@@ -4,7 +4,7 @@ import { friendlyError } from '@/lib/errors';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { useToast } from '@/hooks/useToast';
-import { GateBody, GateHeading, GateLink, GateLogo, GateShell } from './GateShell';
+import { GateBody, GateHeading, GateLink, GateLinks, GateShell } from './GateShell';
 
 const LOGIN_ERROR_MAP: Record<string, string> = {
   'auth/wrong-password': 'Incorrect email or password.',
@@ -61,11 +61,19 @@ export function LoginForm({
   }
 
   return (
-    <GateShell>
-      <GateLogo />
-      <GateHeading>Sign in</GateHeading>
-      <GateBody>Enter your email and password to vote.</GateBody>
-      {error && <p className="mb-3.5 min-h-[1px] text-[13px] text-accent">{error}</p>}
+    <GateShell
+      brand={
+        <>
+          <GateHeading>Sign in</GateHeading>
+          <GateBody>Enter your email and password to vote.</GateBody>
+        </>
+      }
+    >
+      {error && (
+        <p role="alert" className="m-0 mb-4 rounded-xl border border-accent/40 bg-accent/5 px-3.5 py-2.5 text-[13px] text-text">
+          {error}
+        </p>
+      )}
       <form onSubmit={handleSubmit}>
         <Field
           label="Email"
@@ -85,13 +93,19 @@ export function LoginForm({
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <Button type="submit" variant="gate">
-          Log in
-        </Button>
+        <div className="mt-2">
+          <Button type="submit" variant="gate">
+            Log in
+          </Button>
+        </div>
       </form>
-      <GateLink onClick={handleForgot}>Forgot password?</GateLink>
-      <GateLink onClick={onSignup}>New here? Create an account</GateLink>
-      <GateLink onClick={onBack}>‹ Back</GateLink>
+      <GateLinks>
+        <GateLink onClick={handleForgot}>Forgot password?</GateLink>
+        <GateLink onClick={onSignup}>New here? Create an account</GateLink>
+        <GateLink subtle onClick={onBack}>
+          ‹ Back
+        </GateLink>
+      </GateLinks>
     </GateShell>
   );
 }
