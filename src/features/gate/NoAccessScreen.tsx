@@ -15,7 +15,7 @@ export function NoAccessScreen() {
         </>
       }
     >
-      <p className="m-0 mb-6 text-sm leading-relaxed text-text-muted">
+      <p className="m-0 mb-6 text-center text-sm leading-relaxed text-text-muted">
         Once an admin adds you to the team, sign back in and you'll be able to vote.
       </p>
       <GateActions>

@@ -17,8 +17,8 @@ export function Gate({ onVote, onSignup }: { onVote: () => void; onSignup: () =>
         </>
       }
     >
-      <p className="m-0 mb-1.5 font-display text-lg font-bold text-text">Ready to vote?</p>
-      <p className="m-0 mb-6 text-sm leading-relaxed text-text-muted">
+      <p className="m-0 mb-1.5 text-center font-display text-lg font-bold text-text">Ready to vote?</p>
+      <p className="m-0 mb-6 text-center text-sm leading-relaxed text-text-muted">
         Sign in with your Blacfox email to cast this week's vote.
       </p>
       <GateActions>
