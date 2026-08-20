@@ -159,6 +159,18 @@
   z-index: 1;
 }
 
+/* Fades the dark brand panel into the light action panel instead of cutting at a
+   hard seam. Direction flips with the layout: top-to-bottom while stacked on
+   mobile, left-to-right once the two-column split kicks in at lg. */
+.gate-brand-panel {
+  background: linear-gradient(to bottom, var(--text) 82%, var(--bg) 100%);
+}
+@media (min-width: 1024px) {
+  .gate-brand-panel {
+    background: linear-gradient(to right, var(--text) 84%, var(--bg) 100%);
+  }
+}
+
 /* The gate's brand-panel decoration. Distinct from .burst (which the winner-reveal
    card uses) because this one is tuned to bleed off a full panel edge deliberately,
    rather than being clipped inside a small card corner. */

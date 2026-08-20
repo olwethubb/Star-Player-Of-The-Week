@@ -15,7 +15,7 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react';
 export function GateShell({ brand, children }: { brand?: ReactNode; children: ReactNode }) {
   return (
     <div className="lg:grid lg:min-h-screen lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-      <aside className="gate-rays relative isolate overflow-hidden bg-text px-6 pb-12 pt-9 sm:px-10 lg:flex lg:flex-col lg:justify-between lg:pb-14 lg:pt-14">
+      <aside className="gate-rays gate-brand-panel relative isolate overflow-hidden px-6 pb-12 pt-9 sm:px-10 lg:flex lg:flex-col lg:justify-between lg:pb-14 lg:pt-14">
         <GateLogo />
         {brand && <div className="relative z-10 mt-9 lg:mt-0">{brand}</div>}
       </aside>
