@@ -24,9 +24,6 @@ export function GateShell({ brand, children }: { brand?: ReactNode; children: Re
           {/* A contained surface, not the old full-width card: sized to its content so
               it reads as a deliberate action panel instead of text adrift in a void. */}
           <div className="rounded-2xl border border-border bg-bg-card p-6 shadow-card sm:p-7">{children}</div>
-          <p className="mt-5 text-center font-mono text-[10px] uppercase tracking-[0.1em] text-text-muted">
-            Blacfox · internal tool
-          </p>
         </div>
       </main>
     </div>
