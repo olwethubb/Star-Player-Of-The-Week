@@ -12,11 +12,7 @@ export function TopBar({ me, balance }: { me: Profile; balance: number }) {
   return (
     <>
       <div className="mb-7 flex flex-wrap items-center justify-between gap-2.5">
-        {/* Dark plate: the logo artwork is white-on-transparent and would otherwise
-            be invisible against the light theme's background. */}
-        <div className="rounded-2xl bg-text px-4 py-2.5">
-          <img src="/logo.png" alt="Blacfox" className="block h-[84px] w-auto" />
-        </div>
+        <img src="/logo-dark.png" alt="Blacfox" className="block h-[101px] w-auto" />
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-full border border-border px-2.5 py-1 font-mono text-[10px] tracking-[0.08em] text-text-muted">
             {getWeekLabel()}
