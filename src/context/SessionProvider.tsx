@@ -167,15 +167,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedProfiles, loadedSettings, admin]);
 
-  // Only admins ever subscribe to the tally — everyone else just reads
-  // settings.winnerUids/totalVotes, which never exposes per-person data. Admins get
-  // it both once revealed (the Scoreboard breakdown) AND while voting is still open
-  // (so MainScreen can show a live "X votes cast so far" count to help them judge
-  // when it's worth ending voting) — firestore.rules already permits admin reads of
-  // this collection at any time; this is just the app choosing to use it earlier too.
+  // Only admins ever subscribe to the tally, and only once the week is revealed —
+  // everyone else just reads settings.winnerUids/totalVotes, which never exposes
+  // per-person data. Subscribing any earlier is not merely unnecessary, it is denied:
+  // firestore.rules gates tally reads on revealed() precisely so nobody can watch the
+  // live per-candidate count and infer who is voting for whom. Attempting it anyway
+  // surfaces a permission error to the admin as a spurious "couldn't load your data".
   useEffect(() => {
     if (!loadedProfiles || !loadedSettings) return;
-    if (!(admin && (settings.revealed || settings.votingOpen))) {
+    if (!(admin && settings.revealed)) {
       setTally({});
       setLoadedTally(false);
       return;
@@ -193,7 +193,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     );
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadedProfiles, loadedSettings, settings.revealed, settings.votingOpen, admin]);
+  }, [loadedProfiles, loadedSettings, settings.revealed, admin]);
 
   // Only the assigned finance person (or an admin) ever sees the full payout queue.
   useEffect(() => {

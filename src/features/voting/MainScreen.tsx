@@ -7,7 +7,6 @@ import { useCastVote } from '@/hooks/useVotingActions';
 import { BONUS_AMOUNT } from '@/lib/constants';
 import { VoteGrid } from './VoteGrid';
 import { SessionControls } from './SessionControls';
-import { VotingProgress } from './VotingProgress';
 import { useSession } from '@/hooks/useSession';
 
 export function MainScreen() {
@@ -19,8 +18,6 @@ export function MainScreen() {
     myVote,
     myBalance,
     balances,
-    tally,
-    loadedTally,
     payoutQueue,
     payoutHistory,
     myPayout,
@@ -48,10 +45,6 @@ export function MainScreen() {
       </p>
 
       <CashoutCard uid={user.uid} profile={me} balance={myBalance} myPayout={myPayout} financeName={financeName} />
-
-      {isAdmin && votingOpen && (
-        <VotingProgress tally={tally} loadedTally={loadedTally} teammateCount={Object.keys(profiles).length} />
-      )}
 
       <VoteGrid
         votingOpen={votingOpen}
