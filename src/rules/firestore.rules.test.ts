@@ -109,12 +109,46 @@ describe('sotw_myvote', () => {
     const carol = testEnv.authenticatedContext('carol').firestore();
     await assertFails(getDoc(doc(carol, 'sotw_myvote', 'alice')));
   });
+
+  it('rejects an admin casting a vote — they run the reveal, so they sit outside it', async () => {
+    await seedProfile('carol', 'admin');
+    await seedProfile('bob');
+    await seedSettings({ votingOpen: true });
+    const carol = testEnv.authenticatedContext('carol').firestore();
+    await assertFails(setDoc(doc(carol, 'sotw_myvote', 'carol'), { votedForUid: 'bob', ts: null }));
+  });
+
+  it('rejects an owner casting a vote too', async () => {
+    await seedProfile('olga', 'owner');
+    await seedProfile('bob');
+    await seedSettings({ votingOpen: true });
+    const olga = testEnv.authenticatedContext('olga').firestore();
+    await assertFails(setDoc(doc(olga, 'sotw_myvote', 'olga'), { votedForUid: 'bob', ts: null }));
+  });
+
+  it('rejects voting for someone outside the current runoff', async () => {
+    await seedProfile('alice');
+    await seedProfile('bob');
+    await seedProfile('carol');
+    await seedSettings({ votingOpen: true, runoffUids: ['bob'] });
+    const alice = testEnv.authenticatedContext('alice').firestore();
+    await assertFails(setDoc(doc(alice, 'sotw_myvote', 'alice'), { votedForUid: 'carol', ts: null }));
+  });
+
+  it('allows voting for a tied candidate during a runoff', async () => {
+    await seedProfile('alice');
+    await seedProfile('bob');
+    await seedProfile('carol');
+    await seedSettings({ votingOpen: true, runoffUids: ['bob', 'carol'] });
+    const alice = testEnv.authenticatedContext('alice').firestore();
+    await assertSucceeds(setDoc(doc(alice, 'sotw_myvote', 'alice'), { votedForUid: 'bob', ts: null }));
+  });
 });
 
 describe('sotw_tally', () => {
   it('rejects reads from a non-admin', async () => {
     await seedProfile('alice');
-    await seedSettings({ revealed: true });
+    await seedSettings({ votingOpen: false, revealed: true });
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), 'sotw_tally', 'bob'), { count: 3 });
     });
@@ -122,9 +156,9 @@ describe('sotw_tally', () => {
     await assertFails(getDoc(doc(alice, 'sotw_tally', 'bob')));
   });
 
-  it('rejects reads from an admin BEFORE reveal', async () => {
+  it('rejects reads from an admin WHILE voting is still open', async () => {
     await seedProfile('carol', 'admin');
-    await seedSettings({ revealed: false });
+    await seedSettings({ votingOpen: true, revealed: false });
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), 'sotw_tally', 'bob'), { count: 3 });
     });
@@ -132,9 +166,19 @@ describe('sotw_tally', () => {
     await assertFails(getDoc(doc(carol, 'sotw_tally', 'bob')));
   });
 
-  it('allows reads for an admin AFTER reveal', async () => {
+  it('allows reads for an admin once voting is closed, even before reveal — doReveal needs this to compute the winner at all', async () => {
     await seedProfile('carol', 'admin');
-    await seedSettings({ revealed: true });
+    await seedSettings({ votingOpen: false, revealed: false });
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'sotw_tally', 'bob'), { count: 3 });
+    });
+    const carol = testEnv.authenticatedContext('carol').firestore();
+    await assertSucceeds(getDoc(doc(carol, 'sotw_tally', 'bob')));
+  });
+
+  it('allows reads for an admin AFTER reveal too', async () => {
+    await seedProfile('carol', 'admin');
+    await seedSettings({ votingOpen: false, revealed: true });
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), 'sotw_tally', 'bob'), { count: 3 });
     });
@@ -198,6 +242,14 @@ describe('sotw_tally', () => {
     });
     const alice = testEnv.authenticatedContext('alice').firestore();
     await assertFails(setDoc(doc(alice, 'sotw_tally', 'bob'), { count: 50 }));
+  });
+
+  it('rejects an admin nudging a tally — matches them being unable to vote at all', async () => {
+    await seedProfile('carol', 'admin');
+    await seedProfile('bob');
+    await seedSettings({ votingOpen: true });
+    const carol = testEnv.authenticatedContext('carol').firestore();
+    await assertFails(setDoc(doc(carol, 'sotw_tally', 'bob'), { count: 1 }));
   });
 });
 

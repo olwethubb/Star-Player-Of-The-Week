@@ -15,7 +15,8 @@ import {
 import { canManagePayouts as computeCanManagePayouts, DEFAULT_SETTINGS, isAdmin as computeIsAdmin } from '@/types/firestore';
 import type { Profile, Settings } from '@/types/firestore';
 import { getWeekKey } from '@/lib/week';
-import { rollWeek } from '@/services/voting.service';
+import { RUNOFF_ANNOUNCE_MS } from '@/lib/constants';
+import { rollWeek, startRunoff } from '@/services/voting.service';
 import { SessionContext, type PayoutRequestWithId, type PayoutWithId, type SessionState } from './SessionContext';
 import type { User } from 'firebase/auth';
 
@@ -60,6 +61,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const onErr = handleErr(setLoadErrorMsg);
 
   const rollingWeek = useRef(false);
+  const startingRunoff = useRef(false);
 
   // Auth + the four subscriptions every signed-in user always has.
   useEffect(() => {
@@ -250,6 +252,30 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         rollingWeek.current = false;
       });
   }, [loadedProfiles, loadedSettings, admin, settings.currentWeek, profiles]);
+
+  // Nobody clicks a button for this either — the moment ANY admin's client sees a
+  // tie just got announced (revealed=true, more than one winnerUid, no runoff
+  // started yet), it waits long enough for the tie to actually be readable on
+  // screen, then reopens voting restricted to just those names. startRunoff's own
+  // transaction is the real guard against two admins racing; this ref just stops
+  // one admin's own client from firing the timer twice.
+  useEffect(() => {
+    if (!loadedProfiles || !loadedSettings || startingRunoff.current || !admin) return;
+    if (!(settings.revealed && settings.winnerUids.length > 1 && !settings.runoffUids)) return;
+    startingRunoff.current = true;
+    const timer = setTimeout(() => {
+      startRunoff(settings.winnerUids, Object.keys(profiles))
+        .catch((err) => console.warn('Automatic runoff failed to start:', err instanceof Error ? err.message : err))
+        .finally(() => {
+          startingRunoff.current = false;
+        });
+    }, RUNOFF_ANNOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+      startingRunoff.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedProfiles, loadedSettings, admin, settings.revealed, settings.winnerUids, settings.runoffUids, profiles]);
 
   const value: SessionState = {
     user,

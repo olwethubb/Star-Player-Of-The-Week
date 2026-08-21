@@ -25,9 +25,12 @@ export interface Tally {
 export interface Settings {
   revealed: boolean;
   revealing: boolean;
-  bonusAwardedUids: string[];
   winnerUids: string[];
   totalVotes: number;
+  /** Non-null while a runoff round is the active vote: everyone (except admins) can
+   * still vote, but only for one of these uids — the ones who tied last round. Null
+   * outside of a runoff, including during a normal week's voting. */
+  runoffUids: string[] | null;
   financeUid: string | null;
   votingOpen: boolean;
   currentWeek: string | null;
@@ -36,9 +39,9 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   revealed: false,
   revealing: false,
-  bonusAwardedUids: [],
   winnerUids: [],
   totalVotes: 0,
+  runoffUids: null,
   financeUid: null,
   votingOpen: false,
   currentWeek: null,

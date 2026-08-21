@@ -34,7 +34,7 @@ export function ResultsPage() {
         {total} vote{total === 1 ? '' : 's'} cast this week
       </h1>
 
-      <WinnerBlock settings={settings} profiles={profiles} isAdmin={isAdmin} />
+      <WinnerBlock settings={settings} profiles={profiles} />
 
       {isAdmin && loadedTally && <Scoreboard profiles={profiles} tally={tally} total={total} />}
 

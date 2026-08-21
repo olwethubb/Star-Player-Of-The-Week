@@ -35,15 +35,15 @@ service cloud.firestore {
     }
     // Only true while an admin has explicitly opened this week's voting window
     // (the "Start Voting" / "End Voting" buttons). Nobody can cast a vote
-    // outside that window — this is enforced here, not just in the UI.
+    // outside that window — this is enforced here, not just in the UI. Uses
+    // .get() with a default since a settings doc written before this field
+    // existed genuinely has no `votingOpen` key.
     function votingIsOpen() {
-      return get(/databases/$(database)/documents/sotw_meta/settings).data.votingOpen == true;
+      return get(/databases/$(database)/documents/sotw_meta/settings).data.get('votingOpen', false) == true;
     }
-    // Only true once an admin has clicked "Reveal" for this week. Tallies stay
-    // unreadable — even to admins — until this flips, so nobody can watch the
-    // live per-candidate count and reconstruct who's voting for whom.
+    // Only true once an admin has clicked "Reveal" for this week.
     function revealed() {
-      return get(/databases/$(database)/documents/sotw_meta/settings).data.revealed == true;
+      return get(/databases/$(database)/documents/sotw_meta/settings).data.get('revealed', false) == true;
     }
     // The candidate the caller is CURRENTLY on record as voting for (or null).
     // Used to bind a tally decrement to the caller's own prior pick — a
@@ -53,6 +53,14 @@ service cloud.firestore {
       return profileExists(request.auth.uid) && exists(/databases/$(database)/documents/sotw_myvote/$(request.auth.uid))
         ? get(/databases/$(database)/documents/sotw_myvote/$(request.auth.uid)).data.votedForUid
         : null;
+    }
+    // Null outside a runoff. During a runoff it's the tied uids from last round —
+    // voting is still open to everyone (except admins), but only for one of these.
+    // Uses .get() with a default because any settings doc written before this field
+    // existed genuinely has no `runoffUids` key — direct dot access on a missing
+    // key is a rules evaluation error, not null.
+    function currentRunoffUids() {
+      return get(/databases/$(database)/documents/sotw_meta/settings).data.get('runoffUids', null);
     }
 
     // Team roster — everyone signed in needs to read this to see names on the
@@ -96,17 +104,23 @@ service cloud.firestore {
     // Each account's own vote. Nobody else — not even admins — can ever read
     // another person's pick. A vote can only be cast/changed by an actual
     // roster member while an admin has voting open, must be for a real
-    // teammate, and can never be for yourself. Admins may delete any vote doc
-    // anytime (used when removing a teammate or resetting for a new week);
+    // teammate, and can never be for yourself. Admins can't vote at all — they're
+    // the ones running the reveal, so they sit outside the vote entirely. During
+    // a runoff, the pick must also be one of that round's tied names — everyone
+    // still votes, just only among the tied players. Admins may delete any vote
+    // doc anytime (used when removing a teammate or resetting for a new week);
     // someone may delete their own only while voting is closed — otherwise a
     // delete-then-revote loop could nudge the same candidate's tally forever.
     match /sotw_myvote/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
       allow create, update: if signedIn() && request.auth.uid == uid
                             && profileExists(request.auth.uid)
+                            && !isAdmin()
                             && votingIsOpen()
                             && request.resource.data.votedForUid != uid
-                            && profileExists(request.resource.data.votedForUid);
+                            && profileExists(request.resource.data.votedForUid)
+                            && (currentRunoffUids() == null
+                                || request.resource.data.votedForUid in currentRunoffUids());
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid && !votingIsOpen());
     }
 
@@ -122,18 +136,23 @@ service cloud.firestore {
     // scripted client that only ever increments is still a known residual
     // risk; closing that fully needs a server-derived tally, not a rules
     // tweak. This still closes the one-call "zero a rival's count" attack.)
-    // Only admins can ever read the breakdown, and only once the week has
-    // been revealed — otherwise watching the live count is itself a way to
-    // infer who's voting for whom. Only admins may clear it (weekly reset) —
-    // everyone else only ever learns the eventual winner via
-    // settings.winnerUids, which never exposes per-person data.
+    // Only admins can ever read the breakdown, and only once voting has closed
+    // — otherwise watching the live count is itself a way to infer who's voting
+    // for whom. It has to be readable BEFORE revealed() flips, not just after:
+    // doReveal computes the winner from this collection, then commits
+    // revealed:true — gating the read on revealed() itself would make it
+    // impossible for any reveal to ever happen. Closing voting first already
+    // guarantees nobody can change a vote out from under the count being read.
+    // Only admins may clear it (weekly reset) — everyone else only ever learns
+    // the eventual winner via settings.winnerUids, which never exposes
+    // per-person data.
     match /sotw_tally/{uid} {
-      allow read: if isAdmin() && revealed();
-      allow create: if signedIn() && votingIsOpen()
+      allow read: if isAdmin() && !votingIsOpen();
+      allow create: if signedIn() && !isAdmin() && votingIsOpen()
                     && profileExists(request.auth.uid) && profileExists(uid)
                     && request.resource.data.keys().hasOnly(['count'])
                     && request.resource.data.count == 1;
-      allow update: if signedIn() && votingIsOpen()
+      allow update: if signedIn() && !isAdmin() && votingIsOpen()
                     && profileExists(request.auth.uid) && profileExists(uid)
                     && request.resource.data.keys().hasOnly(['count'])
                     && request.resource.data.count is int

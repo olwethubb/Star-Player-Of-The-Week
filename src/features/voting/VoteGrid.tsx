@@ -13,21 +13,15 @@ function initials(name: string): string {
 
 interface VoteGridProps {
   votingOpen: boolean;
-  isAdmin: boolean;
   others: [string, Profile][];
   myVote: string | null;
   pendingUid: string | null;
   onVote: (uid: string) => void;
 }
 
-export function VoteGrid({ votingOpen, isAdmin, others, myVote, pendingUid, onVote }: VoteGridProps) {
+export function VoteGrid({ votingOpen, others, myVote, pendingUid, onVote }: VoteGridProps) {
   if (!votingOpen) {
-    return (
-      <EmptyState icon={<IconLock />}>
-        Voting hasn't opened yet this week.{' '}
-        {isAdmin ? 'Click "Start Voting" below when you\'re ready.' : 'Check back once an admin opens it.'}
-      </EmptyState>
-    );
+    return <EmptyState icon={<IconLock />}>Voting hasn't opened yet this week. Check back once an admin opens it.</EmptyState>;
   }
   if (others.length === 0) {
     return <EmptyState icon={<IconUsers />}>Add more teammates below before voting can start.</EmptyState>;

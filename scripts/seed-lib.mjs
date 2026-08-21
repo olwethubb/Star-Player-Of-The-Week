@@ -59,7 +59,7 @@ export async function getDoc(path) {
 export const DEMO_SETTINGS = {
   revealed: false,
   revealing: false,
-  bonusAwardedUids: [],
+  runoffUids: null,
   winnerUids: [],
   totalVotes: 0,
   financeUid: null,

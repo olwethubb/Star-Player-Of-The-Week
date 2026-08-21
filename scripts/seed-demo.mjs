@@ -7,14 +7,17 @@
 import { DEMO_SETTINGS, resetEmulators, setDoc, signUp } from './seed-lib.mjs';
 
 export const PASSWORD = 'Demo-Pass-2026!';
-export const ME = { name: 'Zanele Mokoena', email: 'zanele@blacfox.com', balance: 300 };
+export const ME = { name: 'Benita', email: 'benita@blacfox.com', balance: 300 };
 export const TEAM = [
-  { name: 'Thandiwe Mabaso', email: 'thandiwe@blacfox.com', balance: 450 },
-  { name: 'Sipho Ndlovu', email: 'sipho@blacfox.com', balance: 300 },
-  { name: 'Lerato Khumalo', email: 'lerato@blacfox.com', balance: 0 },
-  { name: 'Ayanda Zulu', email: 'ayanda@blacfox.com', balance: 150 },
-  { name: 'Naledi Botha', email: 'naledi@blacfox.com', balance: 600 },
-  { name: 'Kagiso Dlamini', email: 'kagiso@blacfox.com', balance: 0 },
+  { name: 'Amilio', email: 'amilio@blacfox.com', balance: 450 },
+  { name: 'Pinto', email: 'pinto@blacfox.com', balance: 300 },
+  { name: 'Laroche', email: 'laroche@blacfox.com', balance: 0 },
+  { name: 'Nomonde', email: 'nomonde@blacfox.com', balance: 150 },
+  { name: 'Indi', email: 'indi@blacfox.com', balance: 600 },
+  { name: 'Jaydon', email: 'jaydon@blacfox.com', balance: 0 },
+  { name: 'Emilio', email: 'emilio@blacfox.com', balance: 0 },
+  { name: 'Malaika', email: 'malaika@blacfox.com', balance: 0 },
+  { name: 'Jerome', email: 'jerome@blacfox.com', balance: 0 },
 ];
 
 await resetEmulators();

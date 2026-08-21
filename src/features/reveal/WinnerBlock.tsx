@@ -1,10 +1,6 @@
 import { IconTrophy, IconWallet } from '@/components/ui/Icons';
-import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { BONUS_AMOUNT } from '@/lib/constants';
-import { awardBonus } from '@/services/voting.service';
-import { useToast } from '@/hooks/useToast';
-import { friendlyError } from '@/lib/errors';
 import type { Profile, Settings } from '@/types/firestore';
 
 function TrophyHeader() {
@@ -18,36 +14,14 @@ function TrophyHeader() {
   );
 }
 
-function TieAwardRow({ uid, profile, awarded }: { uid: string; profile: Profile; awarded: boolean }) {
-  const { notify } = useToast();
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-border-soft py-2.5 last:border-b-0">
-      <span>{profile.name}</span>
-      <Button
-        variant="small"
-        disabled={awarded}
-        onClick={() =>
-          awardBonus(uid, profile, awarded).catch((err) =>
-            notify(friendlyError(err, 'Could not award the bonus. Try again in a moment.')),
-          )
-        }
-      >
-        {awarded ? 'Awarded' : `Award B$${BONUS_AMOUNT}`}
-      </Button>
-    </div>
-  );
-}
-
 export function WinnerBlock({
   settings,
   profiles,
-  isAdmin,
 }: {
   settings: Settings;
   profiles: Record<string, Profile>;
-  isAdmin: boolean;
 }) {
-  const { totalVotes, winnerUids, bonusAwardedUids } = settings;
+  const { totalVotes, winnerUids } = settings;
 
   if (totalVotes === 0) {
     return (
@@ -72,23 +46,13 @@ export function WinnerBlock({
   }
 
   return (
-    <>
-      <div className="mb-[26px] animate-reveal-in rounded-[20px] border border-border bg-bg-card px-5 py-[34px] text-center shadow-card">
-        <TrophyHeader />
-        <p className="m-0 mb-1.5 font-display text-[clamp(22px,6vw,32px)] font-bold">It's a tie</p>
-        <p className="m-0 font-mono text-xs uppercase tracking-[0.05em] text-text-muted [overflow-wrap:anywhere]">
-          {winnerUids.map((u) => profiles[u]?.name ?? '?').join(' · ')}
-        </p>
-      </div>
-      {isAdmin && (
-        <div className="mb-[22px]">
-          {winnerUids.map((uid) => {
-            const profile = profiles[uid];
-            if (!profile) return null;
-            return <TieAwardRow key={uid} uid={uid} profile={profile} awarded={bonusAwardedUids.includes(uid)} />;
-          })}
-        </div>
-      )}
-    </>
+    <div className="mb-[26px] animate-reveal-in rounded-[20px] border border-border bg-bg-card px-5 py-[34px] text-center shadow-card">
+      <TrophyHeader />
+      <p className="m-0 mb-1.5 font-display text-[clamp(22px,6vw,32px)] font-bold">It's a tie</p>
+      <p className="m-0 mb-3.5 font-mono text-xs uppercase tracking-[0.05em] text-text-muted [overflow-wrap:anywhere]">
+        {winnerUids.map((u) => profiles[u]?.name ?? '?').join(' · ')}
+      </p>
+      <p className="m-0 text-sm text-text-muted">A runoff between just these players starts automatically in a few seconds.</p>
+    </div>
   );
 }

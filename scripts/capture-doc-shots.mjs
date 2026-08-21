@@ -11,17 +11,17 @@ import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { DEMO_SETTINGS, resetEmulators, setDoc, signUp } from './seed-lib.mjs';
 
-const URL = 'http://localhost:5199';
+const URL = 'http://localhost:5210';
 const OUT = 'docs/screenshots';
 const PASSWORD = 'Demo-Pass-2026!';
-const ME = { name: 'Zanele Mokoena', email: 'zanele@blacfox.com', balance: 300 };
+const ME = { name: 'Benita', email: 'benita@blacfox.com', balance: 300 };
 const TEAM = [
-  { name: 'Thandiwe Mabaso', email: 'thandiwe@blacfox.com', balance: 450 },
-  { name: 'Sipho Ndlovu', email: 'sipho@blacfox.com', balance: 300 },
-  { name: 'Lerato Khumalo', email: 'lerato@blacfox.com', balance: 0 },
-  { name: 'Ayanda Zulu', email: 'ayanda@blacfox.com', balance: 150 },
-  { name: 'Naledi Botha', email: 'naledi@blacfox.com', balance: 600 },
-  { name: 'Kagiso Dlamini', email: 'kagiso@blacfox.com', balance: 0 },
+  { name: 'Amilio', email: 'amilio@blacfox.com', balance: 450 },
+  { name: 'Pinto', email: 'pinto@blacfox.com', balance: 300 },
+  { name: 'Laroche', email: 'laroche@blacfox.com', balance: 0 },
+  { name: 'Nomonde', email: 'nomonde@blacfox.com', balance: 150 },
+  { name: 'Indi', email: 'indi@blacfox.com', balance: 600 },
+  { name: 'Jaydon', email: 'jaydon@blacfox.com', balance: 0 },
 ];
 
 mkdirSync(OUT, { recursive: true });
@@ -86,8 +86,7 @@ await setDoc('sotw_meta/settings', {
   ...DEMO_SETTINGS,
   revealed: true,
   totalVotes: 6,
-  winnerUids: [uids['thandiwe@blacfox.com']],
-  bonusAwardedUids: [uids['thandiwe@blacfox.com']],
+  winnerUids: [uids['amilio@blacfox.com']],
 });
 await page.reload({ waitUntil: 'load' });
 await page.getByText('Results', { exact: true }).waitFor({ timeout: 25000 });

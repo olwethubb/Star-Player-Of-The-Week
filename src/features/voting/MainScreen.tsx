@@ -31,7 +31,10 @@ export function MainScreen() {
 
   if (!user || !me) return null;
 
-  const others = Object.entries(profiles).filter(([uid]) => uid !== user.uid);
+  const runoffUids = settings.runoffUids;
+  const others = Object.entries(profiles).filter(
+    ([uid]) => uid !== user.uid && (!runoffUids || runoffUids.includes(uid)),
+  );
 
   return (
     <>
@@ -46,14 +49,20 @@ export function MainScreen() {
 
       <CashoutCard uid={user.uid} profile={me} balance={myBalance} myPayout={myPayout} financeName={financeName} />
 
-      <VoteGrid
-        votingOpen={votingOpen}
-        isAdmin={isAdmin}
-        others={others}
-        myVote={myVote}
-        pendingUid={pendingUid}
-        onVote={castVote}
-      />
+      {isAdmin ? (
+        <p className="mb-6 rounded-xl border border-border-soft bg-bg-elevated px-4 py-3 text-[13px] text-text-muted">
+          Admins don't cast a vote — you're running this week's session instead.
+        </p>
+      ) : (
+        <>
+          {runoffUids && (
+            <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.1em] text-accent">
+              Runoff — vote for one of the tied players
+            </p>
+          )}
+          <VoteGrid votingOpen={votingOpen} others={others} myVote={myVote} pendingUid={pendingUid} onVote={castVote} />
+        </>
+      )}
 
       {isAdmin && <SessionControls votingOpen={votingOpen} revealing={!!settings.revealing} profiles={profiles} />}
       <Suspense fallback={null}>
