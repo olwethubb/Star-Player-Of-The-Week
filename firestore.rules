@@ -41,10 +41,6 @@ service cloud.firestore {
     function votingIsOpen() {
       return get(/databases/$(database)/documents/sotw_meta/settings).data.get('votingOpen', false) == true;
     }
-    // Only true once an admin has clicked "Reveal" for this week.
-    function revealed() {
-      return get(/databases/$(database)/documents/sotw_meta/settings).data.get('revealed', false) == true;
-    }
     // The candidate the caller is CURRENTLY on record as voting for (or null).
     // Used to bind a tally decrement to the caller's own prior pick — a
     // decrement can only ever be the caller moving away from someone they
@@ -138,14 +134,14 @@ service cloud.firestore {
     // tweak. This still closes the one-call "zero a rival's count" attack.)
     // Only admins can ever read the breakdown, and only once voting has closed
     // — otherwise watching the live count is itself a way to infer who's voting
-    // for whom. It has to be readable BEFORE revealed() flips, not just after:
-    // doReveal computes the winner from this collection, then commits
-    // revealed:true — gating the read on revealed() itself would make it
-    // impossible for any reveal to ever happen. Closing voting first already
-    // guarantees nobody can change a vote out from under the count being read.
-    // Only admins may clear it (weekly reset) — everyone else only ever learns
-    // the eventual winner via settings.winnerUids, which never exposes
-    // per-person data.
+    // for whom. It has to be readable as soon as voting closes, not gated on a
+    // separate "revealed" flag: doReveal computes the winner from this collection
+    // and only THEN commits revealed:true, so gating the read on reveal having
+    // already happened would make it impossible for any reveal to ever happen.
+    // Closing voting first already guarantees nobody can change a vote out from
+    // under the count being read. Only admins may clear it (weekly reset) —
+    // everyone else only ever learns the eventual winner via settings.winnerUids,
+    // which never exposes per-person data.
     match /sotw_tally/{uid} {
       allow read: if isAdmin() && !votingIsOpen();
       allow create: if signedIn() && !isAdmin() && votingIsOpen()
