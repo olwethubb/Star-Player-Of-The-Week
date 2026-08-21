@@ -27,7 +27,7 @@ export function GateShell({ brand, children }: { brand?: ReactNode; children: Re
 /** The logo artwork is white-on-transparent, so on this dark backdrop it needs no
  * plate of its own — the page *is* its ground. */
 export function GateLogo() {
-  return <img src="/logo.png" alt="Blacfox" className="block h-[60px] w-auto sm:h-[72px]" />;
+  return <img src="/logo.png" alt="Blacfox" className="block h-[75px] w-auto sm:h-[90px]" />;
 }
 
 export function GateEyebrow({ children }: { children: ReactNode }) {
