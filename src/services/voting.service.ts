@@ -116,9 +116,11 @@ export function endVoting() {
   return setDoc(settingsRef, { votingOpen: false }, { merge: true });
 }
 
-/** Nobody clicks a button for this — the moment the calendar week changes, whichever
- * admin/owner happens to have the app open silently clears the previous week's votes
- * and opens a fresh one, whether or not anyone got around to revealing the last one. */
+/** Nobody clicks a button for this — the moment the voting week changes (Friday,
+ * per getWeekKey's Thursday-to-Friday boundary), whichever admin/owner happens to
+ * have the app open silently clears the previous week's votes and opens a fresh
+ * one — voting starts back up automatically rather than waiting on an admin to
+ * click "Start Voting", so it's reliably open first thing Friday. */
 export async function rollWeek(profileUids: string[], newWeekKey: string) {
   const batch = writeBatch(db);
   profileUids.forEach((uid) => batch.delete(myVoteRef(uid)));
@@ -133,7 +135,7 @@ export async function rollWeek(profileUids: string[], newWeekKey: string) {
       bonusAwardedUids: [],
       winnerUids: [],
       totalVotes: 0,
-      votingOpen: false,
+      votingOpen: true,
       currentWeek: newWeekKey,
     },
     { merge: true },

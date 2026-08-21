@@ -235,9 +235,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedProfiles, loadedSettings, canManage]);
 
-  // Nobody clicks a button for this — the moment the calendar week changes, whichever
-  // admin/owner happens to have the app open silently clears the previous week's votes
-  // and opens a fresh one, whether or not anyone got around to revealing the last one.
+  // Nobody clicks a button for this — the moment the voting week changes (Friday,
+  // per getWeekKey's Thursday-to-Friday boundary), whichever admin/owner happens to
+  // have the app open silently clears the previous week's votes and opens a fresh
+  // one, whether or not anyone got around to revealing the last one.
   useEffect(() => {
     if (!loadedProfiles || !loadedSettings || rollingWeek.current || !admin) return;
     const key = getWeekKey();
