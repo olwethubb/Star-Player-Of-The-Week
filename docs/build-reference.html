@@ -1,0 +1,495 @@
+<!--
+  Star Player of the Week — Build Reference
+  Published copy: https://claude.ai/code/artifact/021faadc-bc0a-46f0-a522-7b7a6e656d00
+  This file is kept in sync with that artifact whenever the app changes.
+-->
+<title>Star Player Build Notes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@1,600;1,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #15100b;
+    --ink-raised: #1c1611;
+    --paper: #fff8f0;
+    --paper-muted: rgba(255, 248, 240, 0.68);
+    --paper-faint: rgba(255, 248, 240, 0.42);
+    --line: rgba(255, 248, 240, 0.13);
+    --line-soft: rgba(255, 248, 240, 0.07);
+    --accent: #ff5a1f;
+    --accent-contrast: #241205;
+    --accent-glow: rgba(255, 90, 31, 0.16);
+    --serif: 'Fraunces', Georgia, 'Iowan Old Style', serif;
+    --sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 72px 32px 120px;
+  }
+
+  header.masthead {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 24px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 56px;
+    flex-wrap: wrap;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .doc-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--paper-faint);
+    text-align: right;
+    letter-spacing: 0.02em;
+  }
+
+  h1.title {
+    font-family: var(--serif);
+    font-style: italic;
+    font-weight: 700;
+    font-size: clamp(34px, 5vw, 52px);
+    line-height: 1.05;
+    margin: 10px 0 14px;
+    text-wrap: balance;
+    max-width: 14ch;
+  }
+
+  .lede {
+    font-size: 16px;
+    color: var(--paper-muted);
+    max-width: 62ch;
+    margin: 0 0 40px;
+  }
+
+  section { margin-bottom: 60px; }
+
+  h2.section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--paper);
+    margin: 0 0 24px;
+  }
+
+  h2.section-head .num {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  h2.section-head::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  p { color: var(--paper-muted); }
+  a { color: var(--accent); text-decoration: underline; text-decoration-color: rgba(255,90,31,0.4); }
+
+  /* --- Stack grid --- */
+  .stack-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .stack-cell {
+    background: var(--ink-raised);
+    padding: 20px 20px 22px;
+  }
+  .stack-cell .role {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--paper-faint);
+    margin: 0 0 8px;
+  }
+  .stack-cell .what {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--paper);
+    margin: 0 0 6px;
+  }
+  .stack-cell .detail {
+    font-size: 13px;
+    color: var(--paper-muted);
+    margin: 0;
+    line-height: 1.55;
+  }
+
+  /* --- Architecture diagram --- */
+  .diagram {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    padding: 28px 4px 12px;
+  }
+  .node {
+    flex: 0 0 auto;
+    min-width: 148px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--ink-raised);
+    padding: 16px 18px;
+    text-align: center;
+  }
+  .node .node-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 6px;
+  }
+  .node .node-name {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 14px;
+    margin: 0;
+    color: var(--paper);
+  }
+  .node .node-sub {
+    font-size: 11px;
+    color: var(--paper-faint);
+    margin: 4px 0 0;
+  }
+  .arrow {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 1px;
+    background: var(--line);
+    position: relative;
+  }
+  .arrow::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: -3px;
+    width: 0;
+    height: 0;
+    border-top: 3px solid transparent;
+    border-bottom: 3px solid transparent;
+    border-left: 6px solid var(--paper-faint);
+  }
+
+  /* --- Data model table --- */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 640px; }
+  thead th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--paper-faint);
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--ink-raised);
+  }
+  tbody td {
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--line-soft);
+    color: var(--paper-muted);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.coll { font-family: var(--mono); color: var(--paper); font-size: 12.5px; white-space: nowrap; }
+  td.who { font-family: var(--sans); font-weight: 600; color: var(--accent); font-size: 12.5px; white-space: nowrap; }
+
+  /* --- Security notes --- */
+  .guarantee-list { display: flex; flex-direction: column; gap: 12px; }
+  .guarantee {
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    gap: 12px;
+    align-items: start;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--ink-raised);
+  }
+  .guarantee .check {
+    color: var(--accent);
+    font-family: var(--mono);
+    font-weight: 700;
+    line-height: 1.5;
+  }
+  .guarantee p { margin: 0; font-size: 13.5px; color: var(--paper-muted); }
+  .guarantee strong { color: var(--paper); font-weight: 600; }
+
+  /* --- Deploy commands --- */
+  .cmd-block {
+    font-family: var(--mono);
+    font-size: 13px;
+    background: var(--ink-raised);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px 18px;
+    color: var(--paper);
+    overflow-x: auto;
+    white-space: pre;
+    line-height: 1.7;
+  }
+  .cmd-block .c { color: var(--paper-faint); }
+  .cmd-block .flag { color: var(--accent); }
+
+  /* --- Timeline / changelog --- */
+  .log { border-left: 1px solid var(--line); padding-left: 20px; display: flex; flex-direction: column; gap: 18px; }
+  .log-entry { position: relative; }
+  .log-entry::before {
+    content: '';
+    position: absolute;
+    left: -25px;
+    top: 4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-glow);
+  }
+  .log-entry .log-title { font-family: var(--sans); font-weight: 600; font-size: 14px; color: var(--paper); margin: 0 0 3px; }
+  .log-entry p { margin: 0; font-size: 13px; }
+
+  footer {
+    margin-top: 72px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--paper-faint);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  @media (max-width: 640px) {
+    .wrap { padding: 48px 20px 80px; }
+    header.masthead { flex-direction: column; align-items: flex-start; }
+    .doc-meta { text-align: left; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div>
+      <div class="eyebrow">Internal · Build Reference</div>
+      <h1 class="title">How Star Player of the Week is built</h1>
+    </div>
+    <div class="doc-meta">Owner-only<br>Living document</div>
+  </header>
+
+  <p class="lede">
+    A working reference for presenting this app with full command of the details — the stack, the data
+    model, the security model, and how a change actually reaches production. Updated as the app changes.
+  </p>
+
+  <section>
+    <h2 class="section-head"><span class="num">01</span> The stack</h2>
+    <div class="stack-grid">
+      <div class="stack-cell">
+        <p class="role">Frontend</p>
+        <p class="what">React + TypeScript</p>
+        <p class="detail">Built with Vite. UI styled with Tailwind CSS on a small custom token system (colors, spacing, type scale) rather than a component library's defaults.</p>
+      </div>
+      <div class="stack-cell">
+        <p class="role">Backend</p>
+        <p class="what">Firebase</p>
+        <p class="detail">No custom server. Firebase Authentication handles sign-in (email + password); Cloud Firestore is the database.</p>
+      </div>
+      <div class="stack-cell">
+        <p class="role">Database</p>
+        <p class="what">Cloud Firestore</p>
+        <p class="detail">A NoSQL document database — data lives in named "collections" of JSON-like documents, not SQL tables. Real-time by default: the app subscribes to live updates instead of polling.</p>
+      </div>
+      <div class="stack-cell">
+        <p class="role">Hosting</p>
+        <p class="what">Firebase Hosting</p>
+        <p class="detail">Static site hosting on Google's CDN, deployed straight from the command line. No separate server to patch or scale.</p>
+      </div>
+      <div class="stack-cell">
+        <p class="role">UI primitives</p>
+        <p class="what">Radix UI + custom</p>
+        <p class="detail">Accessible dialog/toast primitives from Radix; everything else (buttons, fields, badges) is a small hand-built component set matching the brand.</p>
+      </div>
+      <div class="stack-cell">
+        <p class="role">Typography</p>
+        <p class="what">Fraunces · Inter · JetBrains Mono</p>
+        <p class="detail">Self-hosted via @fontsource — no third-party font requests at runtime.</p>
+      </div>
+      <div class="stack-cell">
+        <p class="role">Testing</p>
+        <p class="what">Vitest + Firestore emulator</p>
+        <p class="detail">Unit tests for pure logic, plus a dedicated suite that runs the actual security rules against a local Firestore emulator to prove access control, not just UI behavior.</p>
+      </div>
+      <div class="stack-cell">
+        <p class="role">Source control</p>
+        <p class="what">GitHub</p>
+        <p class="detail">Single <code style="color:var(--paper)">main</code> branch. Every change ships as a commit before it deploys.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-head"><span class="num">02</span> How a request flows through it</h2>
+    <div class="diagram">
+      <div class="node">
+        <p class="node-label">Browser</p>
+        <p class="node-name">React app</p>
+        <p class="node-sub">Vite build</p>
+      </div>
+      <div class="arrow"></div>
+      <div class="node">
+        <p class="node-label">Identity</p>
+        <p class="node-name">Firebase Auth</p>
+        <p class="node-sub">email + password</p>
+      </div>
+      <div class="arrow"></div>
+      <div class="node">
+        <p class="node-label">Data</p>
+        <p class="node-name">Firestore</p>
+        <p class="node-sub">real-time listeners</p>
+      </div>
+      <div class="arrow"></div>
+      <div class="node">
+        <p class="node-label">Enforced by</p>
+        <p class="node-name">Security Rules</p>
+        <p class="node-sub">server-side, not the app</p>
+      </div>
+    </div>
+    <p style="font-size:13.5px;">
+      There is no backend server the app talks to for permissions — the client reads and writes Firestore
+      directly, and <strong style="color:var(--paper)">Firestore Security Rules</strong> (a separate file,
+      deployed on its own) decide what any given signed-in user is actually allowed to do. This matters:
+      it means access control can't be bypassed by editing the app's own code, only by changing the rules
+      themselves.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="section-head"><span class="num">03</span> The data model</h2>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Collection</th><th>Holds</th><th>Who can read it</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="coll">sotw_profiles</td><td>Name, email, role (owner / admin / member) for every teammate</td><td class="who">Everyone signed in</td></tr>
+          <tr><td class="coll">sotw_balances</td><td>Each person's Blacfox Dollar balance</td><td class="who">Self, admin, finance</td></tr>
+          <tr><td class="coll">sotw_myvote</td><td>Each person's own current vote — one document per voter</td><td class="who">Only that person</td></tr>
+          <tr><td class="coll">sotw_tally</td><td>Anonymous running vote counts per candidate</td><td class="who">Admin, after reveal only</td></tr>
+          <tr><td class="coll">sotw_meta/settings</td><td>The week's state: is voting open, has it been revealed, who's finance, the winner</td><td class="who">Everyone signed in</td></tr>
+          <tr><td class="coll">sotw_payout_requests</td><td>Pending / approved / rejected cash-out requests</td><td class="who">Requester, admin, finance</td></tr>
+          <tr><td class="coll">sotw_payouts</td><td>Permanent log of every bonus actually paid out</td><td class="who">Admin, finance</td></tr>
+          <tr><td class="coll">sotw_balance_adjustments</td><td>Audit trail for manual balance corrections — who changed what, from what, to what</td><td class="who">Admin, finance</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:13px;margin-top:14px;">Every collection name is prefixed <span style="font-family:var(--mono);color:var(--paper)">sotw_</span> — a deliberate namespace so this app's data can share a Firestore project with something else later without colliding.</p>
+  </section>
+
+  <section>
+    <h2 class="section-head"><span class="num">04</span> What the security model actually guarantees</h2>
+    <div class="guarantee-list">
+      <div class="guarantee">
+        <span class="check">✓</span>
+        <p><strong>Vote privacy is enforced by the database, not the UI.</strong> Nobody — not even an admin — can read who voted for whom. Only anonymous per-candidate totals exist, and even those are hidden until the week is revealed.</p>
+      </div>
+      <div class="guarantee">
+        <span class="check">✓</span>
+        <p><strong>Money can't be minted from the browser console.</strong> Balance writes are constrained by type and direction at the database level — a finance holder can lower a balance, never raise one, regardless of what the app's UI shows.</p>
+      </div>
+      <div class="guarantee">
+        <span class="check">✓</span>
+        <p><strong>The weekly bonus pays out exactly once.</strong> Reveal and payout land in a single atomic operation, so a network hiccup can't leave someone marked as revealed without being paid, or paid twice.</p>
+      </div>
+      <div class="guarantee">
+        <span class="check">✓</span>
+        <p><strong>Every manual money change is logged.</strong> A balance correction from the team panel always writes a permanent record of who made it and what changed — there's no way to quietly adjust a number.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-head"><span class="num">05</span> Shipping a change</h2>
+    <p style="font-size:13.5px;">Two independent deploy targets, kept deliberately separate:</p>
+    <div class="cmd-block"><span class="c"># app code — UI, features, behavior</span>
+firebase deploy <span class="flag">--only hosting</span>
+
+<span class="c"># security rules — who can read/write what in the database</span>
+firebase deploy <span class="flag">--only firestore:rules</span></div>
+    <p style="font-size:13px;margin-top:14px;">
+      Splitting these means a routine UI update can never accidentally loosen (or freeze) the security
+      rules — that only ever happens as its own deliberate step.
+    </p>
+  </section>
+
+  <section>
+    <h2 class="section-head"><span class="num">06</span> Notable milestones</h2>
+    <div class="log">
+      <div class="log-entry">
+        <p class="log-title">Rebuilt from a single-file legacy page</p>
+        <p>The original app was one large HTML file. It was rebuilt as a proper React + TypeScript codebase for maintainability — the legacy version is being retired.</p>
+      </div>
+      <div class="log-entry">
+        <p class="log-title">Gate/auth screen redesign</p>
+        <p>The sign-in experience went through several iterations to a centered, glass-panel design on a dark backdrop.</p>
+      </div>
+      <div class="log-entry">
+        <p class="log-title">Security audit and hardening pass</p>
+        <p>A full review of the Firestore rules found and closed several real gaps — including a way for any signed-in account to inflate vote counts, and a way for the finance role to raise balances instead of only lowering them.</p>
+      </div>
+      <div class="log-entry">
+        <p class="log-title">Admin self-service pass</p>
+        <p>Team and finance management were hardened so routine operations — adding people, fixing a balance, recovering from a stuck state — never require a direct database edit.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Star Player of the Week — build reference</span>
+    <span>Kept in sync with the codebase as it changes</span>
+  </footer>
+
+</div>

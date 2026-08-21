@@ -1,0 +1,325 @@
+<!--
+  Star Player of the Week — Team Handbook
+  Published copy: https://claude.ai/code/artifact/544125c1-e543-43eb-933c-9520492b7aac
+  This file is kept in sync with that artifact whenever the app changes.
+-->
+<title>Star Player Handbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@1,600;1,700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #15100b;
+    --ink-raised: #1c1611;
+    --ink-raised-2: #241c15;
+    --paper: #fff8f0;
+    --paper-muted: rgba(255, 248, 240, 0.7);
+    --paper-faint: rgba(255, 248, 240, 0.44);
+    --line: rgba(255, 248, 240, 0.14);
+    --line-soft: rgba(255, 248, 240, 0.07);
+    --accent: #ff5a1f;
+    --accent-contrast: #241205;
+    --accent-glow: rgba(255, 90, 31, 0.22);
+    --serif: 'Fraunces', Georgia, serif;
+    --sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --mono: 'JetBrains Mono', Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 64px 32px 100px; }
+
+  /* ---- hero ---- */
+  .hero { text-align: center; padding-bottom: 56px; margin-bottom: 56px; border-bottom: 1px solid var(--line); position: relative; }
+  .hero-glow {
+    position: absolute; top: -80px; left: 50%; transform: translateX(-50%);
+    width: 520px; height: 320px; pointer-events: none;
+    background: radial-gradient(ellipse at center, var(--accent-glow), transparent 70%);
+    filter: blur(4px);
+  }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--accent); font-weight: 700; position: relative; z-index: 1;
+  }
+  h1.title {
+    font-family: var(--serif); font-style: italic; font-weight: 700;
+    font-size: clamp(36px, 6vw, 58px); line-height: 1.05; margin: 14px 0 16px;
+    text-wrap: balance; position: relative; z-index: 1;
+  }
+  .hero p.lede {
+    max-width: 46ch; margin: 0 auto; color: var(--paper-muted); font-size: 16px;
+    position: relative; z-index: 1;
+  }
+
+  section { margin-bottom: 64px; }
+  h2.section-head {
+    font-family: var(--sans); font-weight: 800; font-size: 13px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--paper); text-align: center; margin: 0 0 8px;
+  }
+  p.section-sub { text-align: center; color: var(--paper-faint); font-size: 13.5px; margin: 0 0 36px; }
+
+  /* ---- icons (matches the app's own stroke-icon language) ---- */
+  .icon { width: 30px; height: 30px; }
+  .icon svg { width: 100%; height: 100%; fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---- weekly cycle flow ---- */
+  .cycle { display: flex; align-items: flex-start; gap: 0; overflow-x: auto; padding: 12px 4px 20px; }
+  .cycle-step { flex: 1 1 0; min-width: 168px; text-align: center; padding: 0 8px; position: relative; }
+  .step-num {
+    font-family: var(--mono); font-size: 11px; color: var(--paper-faint); letter-spacing: 0.05em; margin-bottom: 14px;
+  }
+  .step-badge {
+    width: 64px; height: 64px; border-radius: 50%; margin: 0 auto 18px;
+    background: var(--ink-raised); border: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step-title { font-family: var(--sans); font-weight: 700; font-size: 15px; margin: 0 0 6px; }
+  .step-desc { font-size: 13px; color: var(--paper-muted); margin: 0; line-height: 1.55; }
+  .cycle-connector {
+    flex: 0 0 auto; width: 36px; align-self: center; margin-top: 32px; height: 1px;
+    background: repeating-linear-gradient(to right, var(--line) 0, var(--line) 5px, transparent 5px, transparent 9px);
+    position: relative;
+  }
+  .cycle-connector::after {
+    content: ''; position: absolute; right: -1px; top: -3px;
+    border-top: 3px solid transparent; border-bottom: 3px solid transparent; border-left: 6px solid var(--paper-faint);
+  }
+
+  /* ---- role grid ---- */
+  .role-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
+  .role-card {
+    background: var(--ink-raised); border: 1px solid var(--line); border-radius: 14px; padding: 22px 20px;
+  }
+  .role-card.is-owner { border-color: rgba(255,90,31,0.35); background: var(--ink-raised-2); }
+  .role-top { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .role-name { font-family: var(--serif); font-style: italic; font-weight: 700; font-size: 19px; margin: 0; }
+  .role-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .role-list li {
+    font-size: 13px; color: var(--paper-muted); padding-left: 16px; position: relative; line-height: 1.5;
+  }
+  .role-list li::before { content: '—'; position: absolute; left: 0; color: var(--paper-faint); }
+
+  /* ---- quick rules strip ---- */
+  .rules-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .rule-cell { background: var(--ink-raised); padding: 20px 20px 22px; display: flex; gap: 14px; }
+  .rule-cell .icon { flex: 0 0 auto; margin-top: 2px; }
+  .rule-cell .rule-title { font-weight: 700; font-size: 14px; margin: 0 0 5px; }
+  .rule-cell .rule-desc { font-size: 12.5px; color: var(--paper-muted); margin: 0; line-height: 1.55; }
+
+  /* ---- cash-out flow ---- */
+  .cashout { display: flex; flex-wrap: wrap; gap: 14px; align-items: stretch; }
+  .cashout-card {
+    flex: 1 1 200px; background: var(--ink-raised); border: 1px solid var(--line); border-radius: 14px;
+    padding: 20px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .cashout-tag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+  .cashout-card p { font-size: 13px; color: var(--paper-muted); margin: 0; line-height: 1.55; }
+  .cashout-arrow { display: flex; align-items: center; color: var(--paper-faint); font-size: 18px; }
+
+  /* ---- faq ---- */
+  .faq { display: flex; flex-direction: column; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .faq-item { background: var(--ink-raised); padding: 18px 22px; }
+  .faq-q { font-weight: 700; font-size: 14px; margin: 0 0 6px; display: flex; gap: 10px; }
+  .faq-q .q-mark { font-family: var(--mono); color: var(--accent); }
+  .faq-a { font-size: 13px; color: var(--paper-muted); margin: 0; padding-left: 22px; line-height: 1.6; }
+
+  footer {
+    margin-top: 72px; padding-top: 24px; border-top: 1px solid var(--line);
+    font-family: var(--mono); font-size: 11px; color: var(--paper-faint);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  }
+
+  @media (max-width: 720px) {
+    .cycle { flex-direction: column; align-items: stretch; }
+    .cycle-connector { display: none; }
+    .cycle-step { min-width: 0; }
+  }
+  @media (max-width: 640px) {
+    .wrap { padding: 48px 20px 80px; }
+  }
+</style>
+
+<div class="wrap">
+
+  <div class="hero">
+    <div class="hero-glow"></div>
+    <div class="eyebrow">Team Handbook</div>
+    <h1 class="title">Star Player<br>of the Week</h1>
+    <p class="lede">How the weekly vote works, who can do what, and how the B$ bonus turns into real money.</p>
+  </div>
+
+  <section>
+    <h2 class="section-head">The weekly cycle</h2>
+    <p class="section-sub">Four stages, every week, in order</p>
+    <div class="cycle">
+      <div class="cycle-step">
+        <div class="step-num">01</div>
+        <div class="step-badge">
+          <span class="icon"><svg viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="11" rx="1.5"/><path d="M4 9 12 4l8 5"/><path d="M9 13l3 3 5-6"/></svg></span>
+        </div>
+        <p class="step-title">Vote</p>
+        <p class="step-desc">Pick one teammate who went above and beyond. Never yourself, and only once — voting again just changes your pick.</p>
+      </div>
+      <div class="cycle-connector"></div>
+      <div class="cycle-step">
+        <div class="step-num">02</div>
+        <div class="step-badge">
+          <span class="icon"><svg viewBox="0 0 24 24"><path d="M12 5a7 7 0 1 0 0 14 7 7 0 0 0 0-14Z"/><path d="M2.5 2.5l19 19M21.5 2.5l-19 19"/></svg></span>
+        </div>
+        <p class="step-title">Stays hidden</p>
+        <p class="step-desc">Counts are invisible to everyone — including admins — until reveal. Nobody can see who's ahead, or who voted for whom, ever.</p>
+      </div>
+      <div class="cycle-connector"></div>
+      <div class="cycle-step">
+        <div class="step-num">03</div>
+        <div class="step-badge">
+          <span class="icon"><svg viewBox="0 0 24 24"><path d="M6 4h12v4a6 6 0 0 1-12 0V4Z"/><path d="M6 6H3a3 3 0 0 0 3 5M18 6h3a3 3 0 0 1-3 5"/><path d="M12 15v3M9 21h6"/></svg></span>
+        </div>
+        <p class="step-title">Revealed</p>
+        <p class="step-desc">An admin closes voting and reveals the winner. A tie means more than one name — an admin decides how it's resolved.</p>
+      </div>
+      <div class="cycle-connector"></div>
+      <div class="cycle-step">
+        <div class="step-num">04</div>
+        <div class="step-badge">
+          <span class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><circle cx="16" cy="14" r="1.4" fill="var(--accent)" stroke="none"/></svg></span>
+        </div>
+        <p class="step-title">Paid</p>
+        <p class="step-desc">The winner's Blacfox Dollar balance goes up automatically — no admin action needed to receive it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-head">Who can do what</h2>
+    <p class="section-sub">Everyone can vote. These are the extra roles layered on top.</p>
+    <div class="role-grid">
+      <div class="role-card">
+        <div class="role-top">
+          <span class="icon" style="width:22px;height:22px"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg></span>
+          <p class="role-name">Member</p>
+        </div>
+        <ul class="role-list">
+          <li>Cast one vote per week</li>
+          <li>See their own Blacfox Dollar balance</li>
+          <li>Request a cash-out of their balance</li>
+          <li>Can't see anyone's vote or the live count</li>
+        </ul>
+      </div>
+      <div class="role-card">
+        <div class="role-top">
+          <span class="icon" style="width:22px;height:22px"><svg viewBox="0 0 24 24"><path d="M12 3l7 4v5c0 5-3 8-7 9-4-1-7-4-7-9V7l7-4Z"/></svg></span>
+          <p class="role-name">Admin</p>
+        </div>
+        <ul class="role-list">
+          <li>Opens and closes voting</li>
+          <li>Reveals the week's result</li>
+          <li>Adds, renames, and removes teammates</li>
+          <li>Approves or rejects cash-out requests</li>
+          <li>Still can't see who voted for whom</li>
+        </ul>
+      </div>
+      <div class="role-card">
+        <div class="role-top">
+          <span class="icon" style="width:22px;height:22px"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="12" rx="2"/><circle cx="12" cy="13" r="2.5"/><path d="M3 10h4M17 10h4"/></svg></span>
+          <p class="role-name">Finance</p>
+        </div>
+        <ul class="role-list">
+          <li>One person at a time, assigned by an admin</li>
+          <li>Can approve a cash-out and lower a balance</li>
+          <li>Can never raise a balance</li>
+          <li>Doesn't get admin's other powers automatically</li>
+        </ul>
+      </div>
+      <div class="role-card is-owner">
+        <div class="role-top">
+          <span class="icon" style="width:22px;height:22px"><svg viewBox="0 0 24 24"><path d="M4 8l3 3 5-6 5 6 3-3-2 10H6L4 8Z"/></svg></span>
+          <p class="role-name">Owner</p>
+        </div>
+        <ul class="role-list">
+          <li>Everything an admin can do</li>
+          <li>Can't be demoted or removed by anyone else — including other admins</li>
+          <li>The one permanent safety net for the whole app</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-head">Ground rules</h2>
+    <p class="section-sub">The four things worth knowing before you vote</p>
+    <div class="rules-grid">
+      <div class="rule-cell">
+        <span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>
+        <div><p class="rule-title">One vote, any time you like</p><p class="rule-desc">You can change your pick as many times as you want while voting is open — only your latest pick counts.</p></div>
+      </div>
+      <div class="rule-cell">
+        <span class="icon"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18" stroke-dasharray="0"/><circle cx="12" cy="12" r="9"/><path d="M8 8l8 8"/></svg></span>
+        <div><p class="rule-title">You can't vote for yourself</p><p class="rule-desc">The app blocks it outright — your own name never appears in your own voting list.</p></div>
+      </div>
+      <div class="rule-cell">
+        <span class="icon"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></span>
+        <div><p class="rule-title">Votes stay private forever</p><p class="rule-desc">Not hidden until reveal — hidden permanently. Nobody, at any level, can look up who you voted for.</p></div>
+      </div>
+      <div class="rule-cell">
+        <span class="icon"><svg viewBox="0 0 24 24"><path d="M12 4l2.5 5 5.5.8-4 4 1 5.5L12 17l-5 2.3 1-5.5-4-4 5.5-.8L12 4Z"/></svg></span>
+        <div><p class="rule-title">Ties mean more than one winner</p><p class="rule-desc">If two or more people are tied for the top vote count, an admin decides how the bonus is handled.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-head">Turning B$ into a payout</h2>
+    <p class="section-sub">Cashing out a Blacfox Dollar balance</p>
+    <div class="cashout">
+      <div class="cashout-card">
+        <span class="cashout-tag">Step 1</span>
+        <p><strong style="color:var(--paper)">Request</strong> — from your balance card, ask to cash out any amount up to what you currently have.</p>
+      </div>
+      <div class="cashout-arrow">→</div>
+      <div class="cashout-card">
+        <span class="cashout-tag">Step 2</span>
+        <p><strong style="color:var(--paper)">Reviewed</strong> — an admin or the finance holder sees it in their queue and either approves or rejects it.</p>
+      </div>
+      <div class="cashout-arrow">→</div>
+      <div class="cashout-card">
+        <span class="cashout-tag">Step 3</span>
+        <p><strong style="color:var(--paper)">Settled</strong> — once approved, your balance drops by that amount and it's logged permanently as paid.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-head">Quick answers</h2>
+    <div class="faq">
+      <div class="faq-item">
+        <p class="faq-q"><span class="q-mark">Q</span> What happens if I forget to vote?</p>
+        <p class="faq-a">Nothing bad — you just won't have a vote counted for that week. There's no penalty, and you can vote again next week.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q"><span class="q-mark">Q</span> Can I see how many people have voted so far?</p>
+        <p class="faq-a">Admins can see a total count while voting is open — but never who's currently ahead, and never who anyone voted for.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q"><span class="q-mark">Q</span> I lost my password — what do I do?</p>
+        <p class="faq-a">Use "Forgot password" on the sign-in screen, or ask an admin to send you a reset link from the team panel.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q"><span class="q-mark">Q</span> Does my Blacfox Dollar balance expire?</p>
+        <p class="faq-a">No — it carries over indefinitely until you request a cash-out.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Star Player of the Week — team handbook</span>
+    <span>Ask an admin if anything here doesn't match what you see</span>
+  </footer>
+
+</div>
