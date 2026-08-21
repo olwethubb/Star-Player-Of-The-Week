@@ -39,7 +39,7 @@ export function ResultsPage() {
       {isAdmin && loadedTally && <Scoreboard profiles={profiles} tally={tally} total={total} />}
 
       {isAdmin && (
-        <p className="mb-5 text-xs text-text-muted">Next week opens automatically once the calendar week changes.</p>
+        <p className="mb-5 text-xs text-text-muted">Voting reopens automatically on Friday, when the new week starts.</p>
       )}
       <Suspense fallback={null}>
         {canManagePayouts && <LazyPayoutQueuePanel queue={payoutQueue} resolvedBy={user.uid} />}
