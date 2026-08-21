@@ -9,7 +9,7 @@ import {
   type DocumentReference,
   type FirestoreDataConverter,
 } from 'firebase/firestore';
-import type { Balance, MyVote, Payout, PayoutRequest, Profile, Settings, Tally } from '@/types/firestore';
+import type { Balance, BalanceAdjustment, MyVote, Payout, PayoutRequest, Profile, Settings, Tally } from '@/types/firestore';
 
 function requiredEnv(key: string): string {
   const value = import.meta.env[key];
@@ -64,6 +64,7 @@ export const myVoteCol = col<MyVote>('sotw_myvote');
 export const tallyCol = col<Tally>('sotw_tally');
 export const payoutRequestsCol = col<PayoutRequest>('sotw_payout_requests');
 export const payoutsCol = col<Payout>('sotw_payouts');
+export const balanceAdjustmentsCol = col<BalanceAdjustment>('sotw_balance_adjustments');
 
 export const settingsRef: DocumentReference<Settings> = doc(db, 'sotw_meta', 'settings').withConverter(
   passthrough<Settings>(),

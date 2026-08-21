@@ -39,6 +39,21 @@ service cloud.firestore {
     function votingIsOpen() {
       return get(/databases/$(database)/documents/sotw_meta/settings).data.votingOpen == true;
     }
+    // Only true once an admin has clicked "Reveal" for this week. Tallies stay
+    // unreadable — even to admins — until this flips, so nobody can watch the
+    // live per-candidate count and reconstruct who's voting for whom.
+    function revealed() {
+      return get(/databases/$(database)/documents/sotw_meta/settings).data.revealed == true;
+    }
+    // The candidate the caller is CURRENTLY on record as voting for (or null).
+    // Used to bind a tally decrement to the caller's own prior pick — a
+    // decrement can only ever be the caller moving away from someone they
+    // actually voted for, never an arbitrary rival's count going down.
+    function myCurrentVote() {
+      return profileExists(request.auth.uid) && exists(/databases/$(database)/documents/sotw_myvote/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/sotw_myvote/$(request.auth.uid)).data.votedForUid
+        : null;
+    }
 
     // Team roster — everyone signed in needs to read this to see names on the
     // vote screen. Admins can create/edit/remove anyone. Someone can also create
@@ -60,34 +75,73 @@ service cloud.firestore {
     // Blacfox Dollar balances — split out from sotw_profiles specifically so a
     // normal member can never read anyone else's balance (profiles must stay
     // broadly readable for names on the vote screen; balances must not be).
-    // Finance can write too since approving a cash-out deducts here directly.
+    // Finance can write too since approving a cash-out deducts here directly —
+    // but finance may only ever LOWER a balance, never raise one or touch any
+    // other field; admins can set it to any valid amount (e.g. correcting an
+    // error), and only admins may delete the doc entirely.
     match /sotw_balances/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || isAdmin() || isFinance());
-      allow write: if isAdmin() || isFinance();
+      allow create: if isAdmin()
+                    && request.resource.data.keys().hasOnly(['balance'])
+                    && request.resource.data.balance is int
+                    && request.resource.data.balance >= 0;
+      allow update: if request.resource.data.keys().hasOnly(['balance'])
+                    && request.resource.data.balance is int
+                    && request.resource.data.balance >= 0
+                    && (isAdmin()
+                        || (isFinance() && request.resource.data.balance < resource.data.balance));
+      allow delete: if isAdmin();
     }
 
     // Each account's own vote. Nobody else — not even admins — can ever read
-    // another person's pick. A vote can only be cast/changed while an admin
-    // has voting open, must be for a real teammate, and can never be for
-    // yourself. Admins may delete any vote doc (used when removing a
-    // teammate or resetting for a new week); everyone may delete their own.
+    // another person's pick. A vote can only be cast/changed by an actual
+    // roster member while an admin has voting open, must be for a real
+    // teammate, and can never be for yourself. Admins may delete any vote doc
+    // anytime (used when removing a teammate or resetting for a new week);
+    // someone may delete their own only while voting is closed — otherwise a
+    // delete-then-revote loop could nudge the same candidate's tally forever.
     match /sotw_myvote/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
       allow create, update: if signedIn() && request.auth.uid == uid
+                            && profileExists(request.auth.uid)
                             && votingIsOpen()
                             && request.resource.data.votedForUid != uid
                             && profileExists(request.resource.data.votedForUid);
-      allow delete: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid && !votingIsOpen());
     }
 
-    // Anonymous running vote counts. Any signed-in account may nudge a count
-    // while voting is open (as part of casting their own vote), but only
-    // admins can ever read the breakdown, and only admins may clear it
-    // (weekly reset) — everyone else only ever learns the eventual winner
-    // via settings.winnerUids, which never exposes per-person data.
+    // Anonymous running vote counts. Only a real roster member may nudge a
+    // count, only while voting is open, and only by exactly the +1/-1 that
+    // casting or changing one vote actually produces (see castVote's
+    // transaction) — never an arbitrary value, and never for a non-existent
+    // candidate. A decrement is further bound to the caller's own recorded
+    // vote — you can only ever bring a count down by moving your OWN pick
+    // away from that person, never by targeting a rival directly. (An
+    // increment can't be bound the same way — Firestore rules can't see a
+    // sibling write's future value earlier in the same transaction — so a
+    // scripted client that only ever increments is still a known residual
+    // risk; closing that fully needs a server-derived tally, not a rules
+    // tweak. This still closes the one-call "zero a rival's count" attack.)
+    // Only admins can ever read the breakdown, and only once the week has
+    // been revealed — otherwise watching the live count is itself a way to
+    // infer who's voting for whom. Only admins may clear it (weekly reset) —
+    // everyone else only ever learns the eventual winner via
+    // settings.winnerUids, which never exposes per-person data.
     match /sotw_tally/{uid} {
-      allow read: if isAdmin();
-      allow create, update: if signedIn() && votingIsOpen();
+      allow read: if isAdmin() && revealed();
+      allow create: if signedIn() && votingIsOpen()
+                    && profileExists(request.auth.uid) && profileExists(uid)
+                    && request.resource.data.keys().hasOnly(['count'])
+                    && request.resource.data.count == 1;
+      allow update: if signedIn() && votingIsOpen()
+                    && profileExists(request.auth.uid) && profileExists(uid)
+                    && request.resource.data.keys().hasOnly(['count'])
+                    && request.resource.data.count is int
+                    && request.resource.data.count >= 0
+                    && (
+                      request.resource.data.count - resource.data.count == 1
+                      || (request.resource.data.count - resource.data.count == -1 && myCurrentVote() == uid)
+                    );
       allow delete: if isAdmin();
     }
 
@@ -105,14 +159,26 @@ service cloud.firestore {
                     && request.resource.data.amount is number
                     && request.resource.data.amount > 0
                     && request.resource.data.amount <= get(/databases/$(database)/documents/sotw_balances/$(request.auth.uid)).data.balance;
-      allow update: if isAdmin() || isFinance()
-                    || (signedIn() && resource.data.uid == request.auth.uid
-                        && resource.data.status == 'pending'
-                        && request.resource.data.status == 'cancelled');
+      allow update: if request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(['status', 'resolvedAt', 'resolvedBy'])
+                    && (isAdmin() || isFinance()
+                        || (signedIn() && resource.data.uid == request.auth.uid
+                            && resource.data.status == 'pending'
+                            && request.resource.data.status == 'cancelled'));
     }
 
     // Historical log of paid-out bonuses. Admin/finance only.
     match /sotw_payouts/{id} {
+      allow read: if isAdmin() || isFinance();
+      allow create: if isAdmin();
+    }
+
+    // Append-only audit trail for manual balance edits from the team panel —
+    // written alongside every such edit so "why is this balance what it is"
+    // never requires a direct Firestore lookup. Only admins trigger these
+    // edits today, so only admins may write; nobody may ever update or
+    // delete a past entry.
+    match /sotw_balance_adjustments/{id} {
       allow read: if isAdmin() || isFinance();
       allow create: if isAdmin();
     }

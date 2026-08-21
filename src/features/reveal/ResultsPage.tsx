@@ -44,7 +44,14 @@ export function ResultsPage() {
       <Suspense fallback={null}>
         {canManagePayouts && <LazyPayoutQueuePanel queue={payoutQueue} resolvedBy={user.uid} />}
         {canManagePayouts && <LazyPastWinnersPanel history={payoutHistory} />}
-        {isAdmin && <LazyManageTeamPanel profiles={profiles} balances={balances} financeUid={settings.financeUid} />}
+        {isAdmin && (
+          <LazyManageTeamPanel
+            profiles={profiles}
+            balances={balances}
+            financeUid={settings.financeUid}
+            actingUid={user.uid}
+          />
+        )}
       </Suspense>
     </>
   );

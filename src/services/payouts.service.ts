@@ -43,7 +43,9 @@ export async function approvePayout(requestId: string, resolvedBy: string) {
     const balance = balSnap.data()?.balance ?? 0;
     if (balance < req.amount) {
       throw new AppValidationError(
-        `${req.name}'s balance is now only B$${balance} — lower than this B$${req.amount} request. Reject it or adjust their balance first.`,
+        balSnap.exists()
+          ? `${req.name}'s balance is now only B$${balance} — lower than this B$${req.amount} request. Reject it, or raise their balance in Team & balances first.`
+          : `${req.name} no longer has a balance on record (they may have been removed) — reject this request, or set a balance for them in Team & balances first.`,
       );
     }
     tx.update(balRef, { balance: balance - req.amount });

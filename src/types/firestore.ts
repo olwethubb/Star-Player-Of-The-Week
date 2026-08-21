@@ -64,6 +64,18 @@ export interface Payout {
   ts: Timestamp | null;
 }
 
+/** Append-only audit trail for manual balance edits from the team panel — so
+ * "why is this balance what it is" is answerable from the app, not by asking
+ * whoever built it to go look in Firestore. Payouts/bonuses already have their
+ * own log (Payout above); this covers the other way a balance changes. */
+export interface BalanceAdjustment {
+  uid: string;
+  from: number;
+  to: number;
+  adjustedBy: string;
+  ts: Timestamp | null;
+}
+
 export function isAdmin(profile: Profile | null | undefined): boolean {
   return !!profile && (profile.role === 'owner' || profile.role === 'admin');
 }

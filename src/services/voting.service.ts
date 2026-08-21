@@ -25,9 +25,10 @@ export async function castVote(myUid: string, forUid: string, votingOpen: boolea
 
 /** Reveal happens in two steps: (1) atomically claim a "revealing" lock so only one
  * admin's click proceeds even if two click at once, then (2) read the now-unlocked
- * tally, work out the winner, and write it together with revealed:true in ONE write —
- * so no client can ever observe revealed=true before the winner is actually known.
- * Returns false if nothing happened (already revealed/revealing). */
+ * tally, work out the winner, and write it together with revealed:true AND the
+ * single-winner payout in ONE batch — so no client can ever observe revealed=true
+ * before the winner is actually known, and the winner is never marked revealed
+ * without also being paid. Returns false if nothing happened (already revealed/revealing). */
 export async function doReveal(profiles: Record<string, Profile>): Promise<boolean> {
   let claimedLock = false;
   try {
@@ -49,12 +50,17 @@ export async function doReveal(profiles: Record<string, Profile>): Promise<boole
     });
 
     const { winnerUids, totalVotes } = computeWinners(tally);
-    await setDoc(settingsRef, { revealed: true, revealing: false, winnerUids, totalVotes }, { merge: true });
 
+    // The reveal and the single-winner payout land in ONE batch: a failure here
+    // must never leave revealed:true committed with the winner unpaid — that
+    // state is invisible from the UI (WinnerBlock just says "+ B$300 awarded")
+    // and, once revealed:true lands, the lock above refuses to run doReveal
+    // again for this week, so there would be no way to retry.
+    const batch = writeBatch(db);
+    batch.set(settingsRef, { revealed: true, revealing: false, winnerUids, totalVotes }, { merge: true });
     if (winnerUids.length === 1) {
       const winnerUid = winnerUids[0]!;
       const winnerName = profiles[winnerUid]?.name ?? '';
-      const batch = writeBatch(db);
       batch.set(balanceRef(winnerUid), { balance: increment(BONUS_AMOUNT) }, { merge: true });
       batch.set(doc(payoutsCol), {
         uid: winnerUid,
@@ -63,8 +69,8 @@ export async function doReveal(profiles: Record<string, Profile>): Promise<boole
         week: getWeekLabel(),
         ts: serverTimestamp(),
       });
-      await batch.commit();
     }
+    await batch.commit();
     return true;
   } catch (err) {
     // If we'd already claimed the lock, an error past this point (a flaky tally read, a
@@ -77,13 +83,29 @@ export async function doReveal(profiles: Record<string, Profile>): Promise<boole
   }
 }
 
+/** `alreadyAwarded` is just a fast client-side skip (and matches the button's own
+ * `disabled` state) — the real guard is the transaction below, which re-reads
+ * bonusAwardedUids fresh at commit time. Without it, two rapid clicks (or two
+ * admins) both read the same stale "not yet awarded" state and both pay out. */
 export async function awardBonus(uid: string, profile: Profile, alreadyAwarded: boolean) {
   if (alreadyAwarded) return;
-  const batch = writeBatch(db);
-  batch.set(balanceRef(uid), { balance: increment(BONUS_AMOUNT) }, { merge: true });
-  batch.set(doc(payoutsCol), { uid, name: profile.name, amount: BONUS_AMOUNT, week: getWeekLabel(), ts: serverTimestamp() });
-  batch.set(settingsRef, { bonusAwardedUids: arrayUnion(uid) }, { merge: true });
-  await batch.commit();
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(settingsRef);
+    const awarded: string[] = snap.data()?.bonusAwardedUids ?? [];
+    if (awarded.includes(uid)) return;
+    tx.set(balanceRef(uid), { balance: increment(BONUS_AMOUNT) }, { merge: true });
+    tx.set(doc(payoutsCol), { uid, name: profile.name, amount: BONUS_AMOUNT, week: getWeekLabel(), ts: serverTimestamp() });
+    tx.set(settingsRef, { bonusAwardedUids: arrayUnion(uid) }, { merge: true });
+  });
+}
+
+/** Escape hatch for a `revealing:true` lock that's stuck — e.g. the admin's tab
+ * closed between the lock transaction committing and the rest of doReveal
+ * running. The normal cleanup only fires from inside doReveal's own catch
+ * block, so a lock stuck this way has no automatic recovery; this lets an
+ * admin clear it from the UI instead of needing a direct Firestore edit. */
+export function forceUnlockReveal() {
+  return setDoc(settingsRef, { revealing: false }, { merge: true });
 }
 
 export function startVoting() {

@@ -62,11 +62,18 @@ export function MainScreen() {
         onVote={castVote}
       />
 
-      {isAdmin && <SessionControls votingOpen={votingOpen} profiles={profiles} />}
+      {isAdmin && <SessionControls votingOpen={votingOpen} revealing={!!settings.revealing} profiles={profiles} />}
       <Suspense fallback={null}>
         {canManagePayouts && <LazyPayoutQueuePanel queue={payoutQueue} resolvedBy={user.uid} />}
         {canManagePayouts && <LazyPastWinnersPanel history={payoutHistory} />}
-        {isAdmin && <LazyManageTeamPanel profiles={profiles} balances={balances} financeUid={settings.financeUid} />}
+        {isAdmin && (
+          <LazyManageTeamPanel
+            profiles={profiles}
+            balances={balances}
+            financeUid={settings.financeUid}
+            actingUid={user.uid}
+          />
+        )}
       </Suspense>
     </>
   );

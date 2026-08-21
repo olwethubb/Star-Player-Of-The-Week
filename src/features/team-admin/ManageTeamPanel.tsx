@@ -8,10 +8,11 @@ interface ManageTeamPanelProps {
   profiles: Record<string, Profile>;
   balances: Record<string, number>;
   financeUid: string | null;
+  actingUid: string;
 }
 
-export function ManageTeamPanel({ profiles, balances, financeUid }: ManageTeamPanelProps) {
-  const actions = useTeamActions(financeUid);
+export function ManageTeamPanel({ profiles, balances, financeUid, actingUid }: ManageTeamPanelProps) {
+  const actions = useTeamActions(actingUid);
   const rows = Object.entries(profiles).sort((a, b) => a[1].name.localeCompare(b[1].name));
 
   return (

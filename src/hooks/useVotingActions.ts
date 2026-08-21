@@ -74,3 +74,21 @@ export function useDoReveal(profiles: Record<string, Profile>) {
 
   return { reveal, pending };
 }
+
+export function useForceUnlockReveal() {
+  const { notify } = useToast();
+  const [pending, setPending] = useState(false);
+
+  const forceUnlock = useCallback(async () => {
+    setPending(true);
+    try {
+      await votingService.forceUnlockReveal();
+    } catch (err) {
+      notify(friendlyError(err, 'Could not clear the lock. Try again in a moment.'));
+    } finally {
+      setPending(false);
+    }
+  }, [notify]);
+
+  return { forceUnlock, pending };
+}
