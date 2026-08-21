@@ -1,4 +1,4 @@
-import { doc, getDocs, runTransaction, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, getDocs, runTransaction, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { db, myVoteRef, payoutsCol, settingsRef, tallyCol, balanceRef } from '@/lib/firebase';
 import { BONUS_AMOUNT } from '@/lib/constants';
 import { computeWinners } from '@/lib/winners';
@@ -120,14 +120,37 @@ export function endVoting() {
  * per getWeekKey's Thursday-to-Friday boundary), whichever admin/owner happens to
  * have the app open silently clears the previous week's votes and opens a fresh
  * one — voting starts back up automatically rather than waiting on an admin to
- * click "Start Voting", so it's reliably open first thing Friday. */
-export async function rollWeek(profileUids: string[], newWeekKey: string) {
+ * click "Start Voting", so it's reliably open first thing Friday.
+ *
+ * A tied winner is only paid when an admin clicks "Award" for them individually
+ * (WinnerBlock/awardBonus) — unlike a solo win, which pays itself the moment it's
+ * revealed. If that click never happens before the week rolls, winnerUids and
+ * bonusAwardedUids below are about to be wiped, which used to drop that payout
+ * silently forever with no record and nothing on screen telling anyone it was
+ * missed. Pay any still-unpaid winner here first, as part of the same commit, so
+ * rolling the week can never be how a tied winner's bonus goes missing. */
+export async function rollWeek(profiles: Record<string, Profile>, newWeekKey: string) {
+  const settingsSnap = await getDoc(settingsRef);
+  const s = settingsSnap.data();
+  const unpaidWinners = (s?.winnerUids ?? []).filter((uid) => !(s?.bonusAwardedUids ?? []).includes(uid));
+
   const batch = writeBatch(db);
-  profileUids.forEach((uid) => batch.delete(myVoteRef(uid)));
+  Object.keys(profiles).forEach((uid) => batch.delete(myVoteRef(uid)));
   const tallySnap = await getDocs(tallyCol);
   tallySnap.forEach((d) => batch.delete(d.ref));
-  await batch.commit();
-  await setDoc(
+
+  unpaidWinners.forEach((uid) => {
+    batch.set(balanceRef(uid), { balance: increment(BONUS_AMOUNT) }, { merge: true });
+    batch.set(doc(payoutsCol), {
+      uid,
+      name: profiles[uid]?.name ?? '',
+      amount: BONUS_AMOUNT,
+      week: getWeekLabel(),
+      ts: serverTimestamp(),
+    });
+  });
+
+  batch.set(
     settingsRef,
     {
       revealed: false,
@@ -140,4 +163,5 @@ export async function rollWeek(profileUids: string[], newWeekKey: string) {
     },
     { merge: true },
   );
+  await batch.commit();
 }

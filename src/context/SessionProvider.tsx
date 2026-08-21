@@ -244,7 +244,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const key = getWeekKey();
     if (settings.currentWeek === key) return;
     rollingWeek.current = true;
-    rollWeek(Object.keys(profiles), key)
+    rollWeek(profiles, key)
       .catch((err) => console.warn('Automatic week rollover failed:', err instanceof Error ? err.message : err))
       .finally(() => {
         rollingWeek.current = false;
