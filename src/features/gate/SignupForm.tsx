@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { signUp } from '@/services/auth.service';
 import { friendlyError } from '@/lib/errors';
-import { SIGNUP_EMAIL_DOMAIN } from '@/lib/constants';
 import { isValidPin } from '@/lib/auth-pin';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
@@ -31,8 +30,8 @@ export function SignupForm({ onLogin, onBack }: { onLogin: () => void; onBack: (
       setError('Enter your full name.');
       return;
     }
-    if (!email.toLowerCase().endsWith(SIGNUP_EMAIL_DOMAIN.toLowerCase())) {
-      setError(`Use your ${SIGNUP_EMAIL_DOMAIN} email address.`);
+    if (!email.trim()) {
+      setError('Enter your email address.');
       return;
     }
     if (!isValidPin(pin)) {
@@ -59,8 +58,7 @@ export function SignupForm({ onLogin, onBack }: { onLogin: () => void; onBack: (
         <>
           <GateHeading wide>Create your account</GateHeading>
           <GateBody>
-            Sign up with your {SIGNUP_EMAIL_DOMAIN} email and a 4-digit PIN. You'll need to verify your email before
-            you can vote.
+            Sign up with your email and a 4-digit PIN. You'll need to verify your email before you can vote.
           </GateBody>
         </>
       }

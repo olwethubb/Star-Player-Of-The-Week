@@ -47,6 +47,41 @@ async function seedSettings(data: Record<string, unknown>) {
   });
 }
 
+describe('sotw_profiles self-signup', () => {
+  it('allows self-signup with any email domain, not just a company one', async () => {
+    const alice = testEnv.authenticatedContext('alice', { email: 'alice@gmail.com' }).firestore();
+    await assertSucceeds(
+      setDoc(doc(alice, 'sotw_profiles', 'alice'), {
+        name: 'Alice',
+        email: 'alice@gmail.com',
+        role: 'member',
+      }),
+    );
+  });
+
+  it("rejects claiming an email that isn't the caller's own verified account email", async () => {
+    const alice = testEnv.authenticatedContext('alice', { email: 'alice@gmail.com' }).firestore();
+    await assertFails(
+      setDoc(doc(alice, 'sotw_profiles', 'alice'), {
+        name: 'Alice',
+        email: 'someone-else@gmail.com',
+        role: 'member',
+      }),
+    );
+  });
+
+  it('rejects self-signup claiming an admin role', async () => {
+    const alice = testEnv.authenticatedContext('alice', { email: 'alice@gmail.com' }).firestore();
+    await assertFails(
+      setDoc(doc(alice, 'sotw_profiles', 'alice'), {
+        name: 'Alice',
+        email: 'alice@gmail.com',
+        role: 'admin',
+      }),
+    );
+  });
+});
+
 describe('sotw_myvote', () => {
   it('rejects voting for yourself', async () => {
     await seedProfile('alice');

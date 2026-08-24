@@ -1,5 +1,4 @@
 export const BONUS_AMOUNT = 300; // Blacfox Dollars awarded to the weekly winner
-export const SIGNUP_EMAIL_DOMAIN = '@blacfox.com';
 
 export const REVEAL_COUNTDOWN_START = 7; // counts down "7… 6… 5… …1" before the wheel spins
 export const REVEAL_COUNTDOWN_MS = REVEAL_COUNTDOWN_START * 1000; // 1s per number
