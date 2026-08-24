@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { signUp } from '@/services/auth.service';
 import { friendlyError } from '@/lib/errors';
 import { SIGNUP_EMAIL_DOMAIN } from '@/lib/constants';
+import { isValidPin } from '@/lib/auth-pin';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { GateBody, GateHeading, GateLink, GateLinks, GateShell } from './GateShell';
@@ -9,7 +10,6 @@ import { GateBody, GateHeading, GateLink, GateLinks, GateShell } from './GateShe
 const SIGNUP_ERROR_MAP: Record<string, string> = {
   'auth/email-already-in-use': 'An account with that email already exists — try logging in instead.',
   'auth/invalid-email': 'That email address looks invalid.',
-  'auth/weak-password': 'Choose a stronger password (at least 6 characters).',
 };
 
 interface FirebaseAuthError {
@@ -19,7 +19,7 @@ interface FirebaseAuthError {
 export function SignupForm({ onLogin, onBack }: { onLogin: () => void; onBack: () => void }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -35,16 +35,16 @@ export function SignupForm({ onLogin, onBack }: { onLogin: () => void; onBack: (
       setError(`Use your ${SIGNUP_EMAIL_DOMAIN} email address.`);
       return;
     }
-    if (password.length < 6) {
-      setError('Password needs to be at least 6 characters.');
+    if (!isValidPin(pin)) {
+      setError('Your PIN must be exactly 4 digits.');
       return;
     }
-    if (password !== confirm) {
-      setError("Passwords don't match.");
+    if (pin !== confirm) {
+      setError("PINs don't match.");
       return;
     }
     setSubmitting(true);
-    signUp(name.trim(), email.trim(), password).catch((err: FirebaseAuthError) => {
+    signUp(name.trim(), email.trim(), pin).catch((err: FirebaseAuthError) => {
       setSubmitting(false);
       setError(
         (err.code && SIGNUP_ERROR_MAP[err.code]) ||
@@ -59,7 +59,8 @@ export function SignupForm({ onLogin, onBack }: { onLogin: () => void; onBack: (
         <>
           <GateHeading wide>Create your account</GateHeading>
           <GateBody>
-            Sign up with your {SIGNUP_EMAIL_DOMAIN} email to vote. You'll need to verify it before you can vote.
+            Sign up with your {SIGNUP_EMAIL_DOMAIN} email and a 4-digit PIN. You'll need to verify your email before
+            you can vote.
           </GateBody>
         </>
       }
@@ -82,22 +83,26 @@ export function SignupForm({ onLogin, onBack }: { onLogin: () => void; onBack: (
           onChange={(e) => setEmail(e.target.value)}
         />
         <Field
-          label="Password"
+          label="4-digit PIN"
           isPassword
+          inputMode="numeric"
+          pattern="[0-9]*"
           autoComplete="new-password"
-          minLength={6}
+          maxLength={4}
           required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
         />
         <Field
-          label="Confirm password"
+          label="Confirm PIN"
           type="password"
+          inputMode="numeric"
+          pattern="[0-9]*"
           autoComplete="new-password"
-          minLength={6}
+          maxLength={4}
           required
           value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
+          onChange={(e) => setConfirm(e.target.value.replace(/\D/g, '').slice(0, 4))}
         />
         <div className="mt-2">
           <Button type="submit" variant="gate" disabled={submitting}>

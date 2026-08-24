@@ -2,16 +2,23 @@ import { createUserWithEmailAndPassword, deleteUser, signOut } from 'firebase/au
 import { deleteDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { withSecondaryAuth } from '@/lib/firebase-secondary';
 import { balanceRef, myVoteRef, profileRef, settingsRef } from '@/lib/firebase';
+import { isValidPin, pinToPassword } from '@/lib/auth-pin';
+import { AppValidationError } from '@/lib/errors';
 import type { Role } from '@/types/firestore';
 
 /** Creates a teammate's Auth user via a throwaway secondary app, so the admin doing
  * this stays signed in — then writes their profile + a zero balance. If either write
  * fails, the just-created Auth user is deleted before the error propagates: without
  * this, that email would be permanently claimed and unrecoverable through the UI —
- * the admin's only retry would then fail with "already in use" forever. */
-export async function createTeamMember(name: string, email: string, password: string, role: Role) {
+ * the admin's only retry would then fail with "already in use" forever. Every
+ * account created here is PIN-based — see pinToPassword for why that's what's
+ * actually stored as the Auth password. */
+export async function createTeamMember(name: string, email: string, pin: string, role: Role) {
+  if (!isValidPin(pin)) {
+    throw new AppValidationError('PIN must be exactly 4 digits.');
+  }
   await withSecondaryAuth(async (secondaryAuth) => {
-    const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+    const cred = await createUserWithEmailAndPassword(secondaryAuth, email, pinToPassword(pin));
     try {
       await Promise.all([
         setDoc(profileRef(cred.user.uid), { name, email, role }),

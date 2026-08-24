@@ -65,7 +65,7 @@ export function LoginForm({
       brand={
         <>
           <GateHeading>Sign in</GateHeading>
-          <GateBody>Enter your email and password to vote.</GateBody>
+          <GateBody>Enter your email and password (or PIN) to vote.</GateBody>
         </>
       }
     >
@@ -86,7 +86,7 @@ export function LoginForm({
           onChange={(e) => setEmail(e.target.value)}
         />
         <Field
-          label="Password"
+          label="Password or PIN"
           isPassword
           autoComplete="current-password"
           required

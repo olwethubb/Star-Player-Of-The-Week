@@ -4,11 +4,8 @@ import { Field } from '@/components/ui/Field';
 import { useTeamActions } from '@/hooks/useTeamActions';
 import type { Role } from '@/types/firestore';
 
-function generatePassword(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
-  let out = '';
-  for (let i = 0; i < 8; i++) out += chars[Math.floor(Math.random() * chars.length)];
-  return out;
+function generatePin(): string {
+  return String(Math.floor(1000 + Math.random() * 9000));
 }
 
 const selectClass =
@@ -17,15 +14,15 @@ const selectClass =
 export function AddMemberForm({ actions }: { actions: ReturnType<typeof useTeamActions> }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
   const [role, setRole] = useState<Role>('member');
 
   async function handleAdd() {
-    const ok = await actions.addMember(name.trim(), email.trim(), password, role);
+    const ok = await actions.addMember(name.trim(), email.trim(), pin, role);
     if (ok) {
       setName('');
       setEmail('');
-      setPassword('');
+      setPin('');
     }
   }
 
@@ -41,9 +38,17 @@ export function AddMemberForm({ actions }: { actions: ReturnType<typeof useTeamA
       />
       <div className="flex items-end gap-2">
         <div className="min-w-0 flex-1">
-          <Field label="Temporary password" type="text" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <Field
+            label="4-digit PIN"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={4}
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+          />
         </div>
-        <Button variant="small" className="mb-3.5" onClick={() => setPassword(generatePassword())}>
+        <Button variant="small" className="mb-3.5" onClick={() => setPin(generatePin())}>
           Generate
         </Button>
       </div>
@@ -57,7 +62,7 @@ export function AddMemberForm({ actions }: { actions: ReturnType<typeof useTeamA
         </Button>
       </div>
       <p className="-mt-2 text-xs text-text-muted">
-        Share the temporary password with them directly. They can reset it anytime from the login screen.
+        Share the PIN with them directly — that's what they'll type in to log in and vote.
       </p>
     </div>
   );

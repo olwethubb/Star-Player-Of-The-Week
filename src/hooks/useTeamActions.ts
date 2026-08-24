@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import * as profilesService from '@/services/profiles.service';
 import * as balancesService from '@/services/balances.service';
 import { friendlyError } from '@/lib/errors';
+import { isValidPin } from '@/lib/auth-pin';
 import { useToast } from '@/hooks/useToast';
 import type { Role } from '@/types/firestore';
 
@@ -79,18 +80,18 @@ export function useTeamActions(actingUid: string) {
   );
 
   const addMember = useCallback(
-    async (name: string, email: string, password: string, role: Role) => {
-      if (!name || !email || !password) {
-        notify('Fill in name, email and a temporary password first.');
+    async (name: string, email: string, pin: string, role: Role) => {
+      if (!name || !email || !pin) {
+        notify('Fill in name, email and a 4-digit PIN first.');
         return false;
       }
-      if (password.length < 6) {
-        notify('Password needs to be at least 6 characters.');
+      if (!isValidPin(pin)) {
+        notify('PIN must be exactly 4 digits.');
         return false;
       }
       setAddingMember(true);
       try {
-        await profilesService.createTeamMember(name, email, password, role);
+        await profilesService.createTeamMember(name, email, pin, role);
         return true;
       } catch (err) {
         const code = (err as FirebaseAuthError).code;
