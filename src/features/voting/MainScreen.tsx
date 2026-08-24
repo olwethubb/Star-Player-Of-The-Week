@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { TopBar } from '@/components/layout/TopBar';
 import { CashoutCard } from '@/features/wallet/CashoutCard';
+import { ChangePinPanel } from '@/features/account/ChangePinPanel';
 import { LazyPastWinnersPanel, LazyPayoutQueuePanel } from '@/features/payouts/PayoutQueuePanel.lazy';
 import { LazyManageTeamPanel } from '@/features/team-admin/ManageTeamPanel.lazy';
 import { useCastVote } from '@/hooks/useVotingActions';
@@ -65,6 +66,7 @@ export function MainScreen() {
       )}
 
       {isAdmin && <SessionControls votingOpen={votingOpen} revealing={!!settings.revealing} profiles={profiles} />}
+      <ChangePinPanel />
       <Suspense fallback={null}>
         {canManagePayouts && <LazyPayoutQueuePanel queue={payoutQueue} resolvedBy={user.uid} />}
         {canManagePayouts && <LazyPastWinnersPanel history={payoutHistory} />}

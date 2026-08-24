@@ -4,6 +4,7 @@ import {
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
+  updatePassword,
   type User,
 } from 'firebase/auth';
 import { setDoc } from 'firebase/firestore';
@@ -40,6 +41,22 @@ export async function signUp(name: string, email: string, pin: string) {
 
 export function resendVerificationEmail(user: User) {
   return sendEmailVerification(user);
+}
+
+/** Lets anyone already signed in switch to (or change) a 4-digit PIN themselves,
+ * without the "reset your password" page's manual doubling trick — this pads it
+ * the same way signUp/createTeamMember do. Firebase requires a "recent" login for
+ * this; a long-since-signed-in session throws auth/requires-recent-login, which
+ * the caller should turn into "log out and back in, then try again" rather than
+ * the generic error. */
+export function changeMyPin(pin: string) {
+  if (!isValidPin(pin)) {
+    throw new AppValidationError('Your PIN must be exactly 4 digits.');
+  }
+  if (!auth.currentUser) {
+    throw new AppValidationError('You need to be signed in to do this.');
+  }
+  return updatePassword(auth.currentUser, pinToPassword(pin));
 }
 
 export function forgotPassword(email: string) {

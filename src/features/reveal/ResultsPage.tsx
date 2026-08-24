@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
 import { TopBar } from '@/components/layout/TopBar';
+import { ChangePinPanel } from '@/features/account/ChangePinPanel';
 import { LazyPastWinnersPanel, LazyPayoutQueuePanel } from '@/features/payouts/PayoutQueuePanel.lazy';
 import { LazyManageTeamPanel } from '@/features/team-admin/ManageTeamPanel.lazy';
 import { useSession } from '@/hooks/useSession';
@@ -41,6 +42,7 @@ export function ResultsPage() {
       {isAdmin && (
         <p className="mb-5 text-xs text-text-muted">Voting reopens automatically on Friday, when the new week starts.</p>
       )}
+      <ChangePinPanel />
       <Suspense fallback={null}>
         {canManagePayouts && <LazyPayoutQueuePanel queue={payoutQueue} resolvedBy={user.uid} />}
         {canManagePayouts && <LazyPastWinnersPanel history={payoutHistory} />}
