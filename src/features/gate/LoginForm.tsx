@@ -9,9 +9,9 @@ import { useToast } from '@/hooks/useToast';
 import { GateBody, GateHeading, GateLink, GateLinks, GateShell } from './GateShell';
 
 const LOGIN_ERROR_MAP: Record<string, string> = {
-  'auth/wrong-password': 'Incorrect email or password.',
-  'auth/user-not-found': 'Incorrect email or password.',
-  'auth/invalid-credential': 'Incorrect email or password.',
+  'auth/wrong-password': 'Incorrect email or PIN.',
+  'auth/user-not-found': 'Incorrect email or PIN.',
+  'auth/invalid-credential': 'Incorrect email or PIN.',
   'auth/invalid-email': 'That email address looks invalid.',
   'auth/user-disabled': 'This account has been disabled. Ask an admin.',
   'auth/too-many-requests': 'Too many attempts — wait a bit and try again.',
@@ -37,7 +37,7 @@ export function LoginForm({
     e.preventDefault();
     setError('');
     if (!email || !password) {
-      setError('Enter both your email and password.');
+      setError('Enter both your email and your PIN.');
       return;
     }
     login(email, password)
@@ -69,7 +69,7 @@ export function LoginForm({
       brand={
         <>
           <GateHeading>Sign in</GateHeading>
-          <GateBody>Enter your email and password (or PIN) to vote.</GateBody>
+          <GateBody>Enter your email and PIN to vote.</GateBody>
         </>
       }
     >
@@ -90,7 +90,7 @@ export function LoginForm({
           onChange={(e) => setEmail(e.target.value)}
         />
         <Field
-          label="Password or PIN"
+          label="PIN"
           isPassword
           autoComplete="current-password"
           required
@@ -104,7 +104,7 @@ export function LoginForm({
         </div>
       </form>
       <GateLinks>
-        <GateLink onClick={handleForgot}>Forgot password?</GateLink>
+        <GateLink onClick={handleForgot}>Forgot your PIN?</GateLink>
         <GateLink onClick={onSignup}>New here? Create an account</GateLink>
         <GateLink subtle onClick={onBack}>
           ‹ Back
