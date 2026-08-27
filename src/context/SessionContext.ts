@@ -1,5 +1,5 @@
 import { createContext } from 'react';
-import type { Payout, PayoutRequest, Profile, Settings } from '@/types/firestore';
+import type { Payout, PayoutRequest, Profile, Settings, StatDeclaration } from '@/types/firestore';
 import type { User } from 'firebase/auth';
 
 export interface PayoutRequestWithId extends PayoutRequest {
@@ -34,12 +34,19 @@ export interface SessionState {
   /** Recent past bonus payouts (winners + tie awards) — admin/finance only, same
    * audience as `payoutQueue`; empty for everyone else. */
   payoutHistory: PayoutWithId[];
+  /** Everyone's most recent self-declared status, uid -> declaration. Check
+   * `.weekKey === settings.currentWeek` before trusting `.status` — a declaration
+   * from a past week doesn't carry over. Only 'up' this week makes someone
+   * votable; the actual enforcement is firestore.rules (isUpThisWeek), this is
+   * what the UI filters by. */
+  statStatuses: Record<string, StatDeclaration>;
   loadedProfiles: boolean;
   loadedSettings: boolean;
   loadedMyVote: boolean;
   loadedMyBalance: boolean;
   loadedTally: boolean;
   loadedBalances: boolean;
+  loadedStatStatuses: boolean;
   loadErrorMsg: string | null;
   me: Profile | null;
   isAdmin: boolean;

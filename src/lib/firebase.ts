@@ -10,7 +10,18 @@ import {
   type DocumentReference,
   type FirestoreDataConverter,
 } from 'firebase/firestore';
-import type { Balance, BalanceAdjustment, MyVote, Payout, PayoutRequest, Profile, Settings, Tally } from '@/types/firestore';
+import type {
+  Balance,
+  BalanceAdjustment,
+  MyVote,
+  Payout,
+  PayoutRequest,
+  Profile,
+  Settings,
+  StatDeclaration,
+  Tally,
+  WeeklyActivity,
+} from '@/types/firestore';
 
 function requiredEnv(key: string): string {
   const value = import.meta.env[key];
@@ -77,6 +88,8 @@ export const tallyCol = col<Tally>('sotw_tally');
 export const payoutRequestsCol = col<PayoutRequest>('sotw_payout_requests');
 export const payoutsCol = col<Payout>('sotw_payouts');
 export const balanceAdjustmentsCol = col<BalanceAdjustment>('sotw_balance_adjustments');
+export const statStatusCol = col<StatDeclaration>('sotw_stat_status');
+export const weeklyActivityCol = col<WeeklyActivity>('sotw_weekly_activity');
 
 export const settingsRef: DocumentReference<Settings> = doc(db, 'sotw_meta', 'settings').withConverter(
   passthrough<Settings>(),
@@ -93,4 +106,10 @@ export function myVoteRef(uid: string): DocumentReference<MyVote> {
 }
 export function tallyRef(uid: string): DocumentReference<Tally> {
   return doc(tallyCol, uid);
+}
+export function statStatusRef(uid: string): DocumentReference<StatDeclaration> {
+  return doc(statStatusCol, uid);
+}
+export function weeklyActivityRef(weekKey: string, uid: string): DocumentReference<WeeklyActivity> {
+  return doc(weeklyActivityCol, `${weekKey}_${uid}`);
 }

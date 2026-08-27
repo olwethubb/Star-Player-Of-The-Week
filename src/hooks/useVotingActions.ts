@@ -51,7 +51,29 @@ export function useSessionControls() {
     }
   }, [notify]);
 
-  return { start, end, pending };
+  const pauseWeek = useCallback(async () => {
+    setPending(true);
+    try {
+      await votingService.pauseWeek();
+    } catch (err) {
+      notify(friendlyError(err, 'Could not pause this week. Try again in a moment.'));
+    } finally {
+      setPending(false);
+    }
+  }, [notify]);
+
+  const resumeWeek = useCallback(async () => {
+    setPending(true);
+    try {
+      await votingService.resumeWeek();
+    } catch (err) {
+      notify(friendlyError(err, 'Could not resume this week. Try again in a moment.'));
+    } finally {
+      setPending(false);
+    }
+  }, [notify]);
+
+  return { start, end, pauseWeek, resumeWeek, pending };
 }
 
 export function useDoReveal(profiles: Record<string, Profile>) {

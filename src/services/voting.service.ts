@@ -1,8 +1,8 @@
 import { doc, getDocs, runTransaction, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
-import { db, myVoteRef, payoutsCol, settingsRef, tallyCol, balanceRef } from '@/lib/firebase';
+import { db, myVoteRef, payoutsCol, settingsRef, tallyCol, balanceRef, weeklyActivityRef } from '@/lib/firebase';
 import { BONUS_AMOUNT } from '@/lib/constants';
 import { computeWinners } from '@/lib/winners';
-import { getWeekLabel } from '@/lib/week';
+import { getWeekKey, getWeekLabel } from '@/lib/week';
 import type { Profile } from '@/types/firestore';
 import { increment } from 'firebase/firestore';
 
@@ -67,6 +67,13 @@ export async function doReveal(profiles: Record<string, Profile>): Promise<boole
       { revealed: true, revealing: false, winnerUids, totalVotes, runoffUids: null },
       { merge: true },
     );
+    // The tally itself gets wiped (here or at the next rollover) — this is the only
+    // lasting record of who actually received a vote this week, which is what
+    // streak badges are computed from.
+    const weekKey = getWeekKey();
+    Object.entries(tally).forEach(([uid, count]) => {
+      batch.set(weeklyActivityRef(weekKey, uid), { uid, weekKey, received: count > 0 });
+    });
     if (winnerUids.length === 1) {
       const winnerUid = winnerUids[0]!;
       const winnerName = profiles[winnerUid]?.name ?? '';
@@ -139,6 +146,17 @@ export function endVoting() {
   return setDoc(settingsRef, { votingOpen: false }, { merge: true });
 }
 
+/** Marks the current week as intentionally skipped (holiday, etc.) so the vote
+ * screen shows "no vote this week" instead of the ambiguous "hasn't opened yet",
+ * which reads as "the admin forgot". Cleared automatically on the next rollover. */
+export function pauseWeek() {
+  return setDoc(settingsRef, { weekPaused: true, votingOpen: false }, { merge: true });
+}
+
+export function resumeWeek() {
+  return setDoc(settingsRef, { weekPaused: false }, { merge: true });
+}
+
 /** Nobody clicks a button for this — the moment the voting week changes (Friday,
  * per getWeekKey's Thursday-to-Friday boundary), whichever admin/owner happens to
  * have the app open silently clears the previous week's votes and opens a fresh
@@ -162,6 +180,7 @@ export async function rollWeek(profiles: Record<string, Profile>, newWeekKey: st
       runoffUids: null,
       votingOpen: true,
       currentWeek: newWeekKey,
+      weekPaused: false,
     },
     { merge: true },
   );

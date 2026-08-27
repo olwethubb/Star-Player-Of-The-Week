@@ -10,10 +10,11 @@ import {
   payoutsCol,
   profilesCol,
   settingsRef,
+  statStatusCol,
   tallyCol,
 } from '@/lib/firebase';
 import { canManagePayouts as computeCanManagePayouts, DEFAULT_SETTINGS, isAdmin as computeIsAdmin } from '@/types/firestore';
-import type { Profile, Settings } from '@/types/firestore';
+import type { Profile, Settings, StatDeclaration } from '@/types/firestore';
 import { getWeekKey } from '@/lib/week';
 import { RUNOFF_ANNOUNCE_MS } from '@/lib/constants';
 import { rollWeek, startRunoff } from '@/services/voting.service';
@@ -53,6 +54,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [loadedBalances, setLoadedBalances] = useState(false);
 
+  const [statStatuses, setStatStatuses] = useState<Record<string, StatDeclaration>>({});
+  const [loadedStatStatuses, setLoadedStatStatuses] = useState(false);
+
   const [payoutQueue, setPayoutQueue] = useState<PayoutRequestWithId[]>([]);
   const [myPayout, setMyPayout] = useState<PayoutRequestWithId | null>(null);
   const [payoutHistory, setPayoutHistory] = useState<PayoutWithId[]>([]);
@@ -73,6 +77,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setLoadedSettings(false);
       setLoadedMyVote(false);
       setLoadedMyBalance(false);
+      setLoadedStatStatuses(false);
       setLoadErrorMsg(null);
     });
     return unsubAuth;
@@ -131,12 +136,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       },
       onErr,
     );
+    const unsubStatStatuses = onSnapshot(
+      statStatusCol,
+      (snap) => {
+        const s: Record<string, StatDeclaration> = {};
+        snap.forEach((d) => (s[d.id] = d.data()));
+        setStatStatuses(s);
+        setLoadedStatStatuses(true);
+      },
+      onErr,
+    );
     return () => {
       unsubProfiles();
       unsubSettings();
       unsubMyVote();
       unsubMyBalance();
       unsubMyPayout();
+      unsubStatStatuses();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -288,6 +304,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     myBalance,
     tally,
     balances,
+    statStatuses,
     payoutQueue,
     myPayout,
     payoutHistory,
@@ -297,6 +314,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     loadedMyBalance,
     loadedTally,
     loadedBalances,
+    loadedStatStatuses,
     loadErrorMsg,
     me,
     isAdmin: admin,

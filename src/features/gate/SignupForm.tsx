@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { signUp } from '@/services/auth.service';
 import { friendlyError } from '@/lib/errors';
-import { isValidPin } from '@/lib/auth-pin';
+import { isValidPin, pinToPassword } from '@/lib/auth-pin';
+import { rememberCredential } from '@/lib/deviceCredential';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { GateBody, GateHeading, GateLink, GateLinks, GateShell } from './GateShell';
@@ -43,13 +44,15 @@ export function SignupForm({ onLogin, onBack }: { onLogin: () => void; onBack: (
       return;
     }
     setSubmitting(true);
-    signUp(name.trim(), email.trim(), pin).catch((err: FirebaseAuthError) => {
-      setSubmitting(false);
-      setError(
-        (err.code && SIGNUP_ERROR_MAP[err.code]) ||
-          friendlyError(err, 'Could not create your account. Try again in a moment.'),
-      );
-    });
+    signUp(name.trim(), email.trim(), pin)
+      .then(() => rememberCredential(email.trim(), pinToPassword(pin), name.trim()))
+      .catch((err: FirebaseAuthError) => {
+        setSubmitting(false);
+        setError(
+          (err.code && SIGNUP_ERROR_MAP[err.code]) ||
+            friendlyError(err, 'Could not create your account. Try again in a moment.'),
+        );
+      });
   }
 
   return (

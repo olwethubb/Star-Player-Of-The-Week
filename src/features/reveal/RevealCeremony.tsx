@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { speak } from '@/lib/speech';
+import { playChime } from '@/lib/chime';
 import { useTtsPreference } from '@/hooks/useTtsPreference';
 import type { Profile, Settings } from '@/types/firestore';
 import type { CeremonyPhase } from '@/hooks/useRevealCeremony';
@@ -36,6 +37,7 @@ export function RevealCeremony({
 
   useEffect(() => {
     if (phase !== 'landed' || !ttsEnabled) return;
+    playChime();
     speak(winnerAnnouncement(settings.totalVotes, settings.winnerUids, profiles));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, ttsEnabled]);

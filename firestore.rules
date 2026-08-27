@@ -58,6 +58,19 @@ service cloud.firestore {
     function currentRunoffUids() {
       return get(/databases/$(database)/documents/sotw_meta/settings).data.get('runoffUids', null);
     }
+    function currentWeekKey() {
+      return get(/databases/$(database)/documents/sotw_meta/settings).data.get('currentWeek', null);
+    }
+    // True only if `uid` declared 'up' for the week that's active RIGHT NOW — a
+    // declaration from a prior week doesn't carry over, so everyone re-declares
+    // each week rather than silently staying eligible off a stale pick. This is
+    // what actually keeps a 'down' person off the poll: nobody can ever cast a
+    // vote for them, so they can never receive one.
+    function isUpThisWeek(uid) {
+      return exists(/databases/$(database)/documents/sotw_stat_status/$(uid))
+        && get(/databases/$(database)/documents/sotw_stat_status/$(uid)).data.status == 'up'
+        && get(/databases/$(database)/documents/sotw_stat_status/$(uid)).data.weekKey == currentWeekKey();
+    }
 
     // Team roster — everyone signed in needs to read this to see names on the
     // vote screen. Admins can create/edit/remove anyone. Someone can also create
@@ -73,7 +86,15 @@ service cloud.firestore {
                     || (signedIn() && request.auth.uid == uid
                         && request.resource.data.role == 'member'
                         && request.resource.data.email == request.auth.token.email);
-      allow update, delete: if isAdmin();
+      // Anyone can set their OWN avatar — admins can set anyone's (uploading a
+      // teammate's photo for them), still touching only that one field either way.
+      // Every other field on a profile (name, email, role) still needs an admin.
+      allow update: if isAdmin()
+                    || (signedIn() && request.auth.uid == uid
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['avatarUrl'])
+                        && request.resource.data.avatarUrl is string
+                        && request.resource.data.avatarUrl.size() < 200000);
+      allow delete: if isAdmin();
     }
 
     // Blacfox Dollar balances — split out from sotw_profiles specifically so a
@@ -103,10 +124,13 @@ service cloud.firestore {
     // teammate, and can never be for yourself. Admins can't vote at all — they're
     // the ones running the reveal, so they sit outside the vote entirely. During
     // a runoff, the pick must also be one of that round's tied names — everyone
-    // still votes, just only among the tied players. Admins may delete any vote
-    // doc anytime (used when removing a teammate or resetting for a new week);
-    // someone may delete their own only while voting is closed — otherwise a
-    // delete-then-revote loop could nudge the same candidate's tally forever.
+    // still votes, just only among the tied players. The pick must also currently
+    // be 'up' for this week (see isUpThisWeek) — someone who declared 'down' can
+    // still vote themselves, they just can't be voted FOR, so they never even
+    // reach a tie to be part of a runoff. Admins may delete any vote doc anytime
+    // (used when removing a teammate or resetting for a new week); someone may
+    // delete their own only while voting is closed — otherwise a delete-then-revote
+    // loop could nudge the same candidate's tally forever.
     match /sotw_myvote/{uid} {
       allow read: if signedIn() && request.auth.uid == uid;
       allow create, update: if signedIn() && request.auth.uid == uid
@@ -115,6 +139,7 @@ service cloud.firestore {
                             && votingIsOpen()
                             && request.resource.data.votedForUid != uid
                             && profileExists(request.resource.data.votedForUid)
+                            && isUpThisWeek(request.resource.data.votedForUid)
                             && (currentRunoffUids() == null
                                 || request.resource.data.votedForUid in currentRunoffUids());
       allow delete: if isAdmin() || (signedIn() && request.auth.uid == uid && !votingIsOpen());
@@ -146,6 +171,7 @@ service cloud.firestore {
       allow read: if isAdmin() && !votingIsOpen();
       allow create: if signedIn() && !isAdmin() && votingIsOpen()
                     && profileExists(request.auth.uid) && profileExists(uid)
+                    && isUpThisWeek(uid)
                     && request.resource.data.keys().hasOnly(['count'])
                     && request.resource.data.count == 1;
       allow update: if signedIn() && !isAdmin() && votingIsOpen()
@@ -154,7 +180,12 @@ service cloud.firestore {
                     && request.resource.data.count is int
                     && request.resource.data.count >= 0
                     && (
-                      request.resource.data.count - resource.data.count == 1
+                      // Nudging someone's count UP requires them to be up this week, same
+                      // as a first vote (create). Nudging it DOWN doesn't — that's always
+                      // just the caller correcting away from their own prior pick, and a
+                      // candidate switching to 'down' mid-week must not leave an already-cast
+                      // vote for them permanently stuck with no way to be corrected off.
+                      (request.resource.data.count - resource.data.count == 1 && isUpThisWeek(uid))
                       || (request.resource.data.count - resource.data.count == -1 && myCurrentVote() == uid)
                     );
       allow delete: if isAdmin();
@@ -163,6 +194,30 @@ service cloud.firestore {
     match /sotw_meta/{doc} {
       allow read: if signedIn();
       allow write: if isAdmin();
+    }
+
+    // Self-declared "are my stats up or down this week" — one doc per person,
+    // always about the CURRENT week (see StatDeclaration). Only the person
+    // themselves can set it; admins deliberately can't set it on someone else's
+    // behalf, since it's meant to be an honest self-report. Readable by anyone
+    // signed in — the vote screen needs it to build the eligible-candidate list
+    // client-side (the real enforcement is isUpThisWeek, used above).
+    match /sotw_stat_status/{uid} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.auth.uid == uid
+                            && profileExists(uid)
+                            && request.resource.data.status in ['up', 'down']
+                            && request.resource.data.weekKey == currentWeekKey();
+    }
+
+    // One doc per person per week, written by doReveal alongside reading the
+    // tally (the tally itself gets wiped on rollover, this is what's left after).
+    // Only admins write it — same trust boundary as sotw_payouts, which is
+    // written by the same code path. Readable by anyone so streak badges can be
+    // computed and shown on any profile, not just the admin's own view.
+    match /sotw_weekly_activity/{id} {
+      allow read: if signedIn();
+      allow create: if isAdmin();
     }
 
     // Cash-out requests. The requester can read/cancel their own, admins and

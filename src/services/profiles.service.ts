@@ -43,6 +43,13 @@ export function renameTeammate(uid: string, name: string) {
   return updateDoc(profileRef(uid), { name });
 }
 
+/** Same call whether it's someone setting their own avatar or an admin setting a
+ * teammate's — firestore.rules is what actually distinguishes those (self, or
+ * isAdmin()), not this function. */
+export function setAvatar(uid: string, dataUri: string) {
+  return updateDoc(profileRef(uid), { avatarUrl: dataUri });
+}
+
 /** Note: if they'd already voted this week, that vote's count stays in the anonymous
  * tally — it can't be reversed without knowing who they picked, which nobody may see. */
 export async function removeTeammate(uid: string) {

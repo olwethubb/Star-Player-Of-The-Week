@@ -18,7 +18,7 @@ const COLORS = [
   'var(--confetti-teal)',
   'var(--confetti-violet)',
 ];
-const SPARK_COUNT = 36;
+const SPARK_COUNT = 64;
 
 let nextId = 0;
 

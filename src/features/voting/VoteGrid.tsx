@@ -1,25 +1,24 @@
 import { IconCheck, IconLock, IconUsers } from '@/components/ui/Icons';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Avatar } from '@/components/ui/Avatar';
+import { useStreaks } from '@/hooks/useStreaks';
 import type { Profile } from '@/types/firestore';
-
-function initials(name: string): string {
-  return (name || '?')
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase())
-    .join('');
-}
 
 interface VoteGridProps {
   votingOpen: boolean;
+  weekPaused: boolean;
   others: [string, Profile][];
   myVote: string | null;
   pendingUid: string | null;
   onVote: (uid: string) => void;
 }
 
-export function VoteGrid({ votingOpen, others, myVote, pendingUid, onVote }: VoteGridProps) {
+export function VoteGrid({ votingOpen, weekPaused, others, myVote, pendingUid, onVote }: VoteGridProps) {
+  const streaks = useStreaks();
+
+  if (weekPaused) {
+    return <EmptyState icon={<IconLock />}>No vote this week — see you next Friday!</EmptyState>;
+  }
   if (!votingOpen) {
     return <EmptyState icon={<IconLock />}>Voting hasn't opened yet this week. Check back once an admin opens it.</EmptyState>;
   }
@@ -32,6 +31,7 @@ export function VoteGrid({ votingOpen, others, myVote, pendingUid, onVote }: Vot
       <div className="mb-6 grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
         {others.map(([uid, p]) => {
           const voted = myVote === uid;
+          const streak = streaks[uid];
           return (
             <div
               key={uid}
@@ -39,10 +39,15 @@ export function VoteGrid({ votingOpen, others, myVote, pendingUid, onVote }: Vot
                 voted ? 'border-2 border-accent p-[15px]' : 'border border-border p-4 hover:-translate-y-0.5 hover:border-accent'
               }`}
             >
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[10px] bg-accent font-display text-sm font-bold text-accent-contrast">
-                {initials(p.name)}
+              <Avatar name={p.name} avatarUrl={p.avatarUrl} />
+              <div className="min-w-0 flex-1 font-display text-[15px] font-semibold [overflow-wrap:anywhere]">
+                {p.name}
+                {!!streak && streak >= 3 && (
+                  <span className="ml-1.5 whitespace-nowrap font-mono text-[11px] font-normal text-accent" title={`Received votes ${streak} weeks running`}>
+                    🔥{streak}
+                  </span>
+                )}
               </div>
-              <div className="min-w-0 flex-1 font-display text-[15px] font-semibold [overflow-wrap:anywhere]">{p.name}</div>
               <button
                 disabled={pendingUid === uid}
                 onClick={() => onVote(uid)}

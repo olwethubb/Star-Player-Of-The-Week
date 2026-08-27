@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { getDocs, query, where } from 'firebase/firestore';
+import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -7,7 +8,9 @@ import { useTeamActions } from '@/hooks/useTeamActions';
 import { useToast } from '@/hooks/useToast';
 import { friendlyError } from '@/lib/errors';
 import { balanceAdjustmentsCol } from '@/lib/firebase';
+import { fileToAvatarDataUri } from '@/lib/avatar';
 import { forgotPassword } from '@/services/auth.service';
+import { setAvatar } from '@/services/profiles.service';
 import type { BalanceAdjustment, Profile } from '@/types/firestore';
 
 interface MemberRowProps {
@@ -70,6 +73,8 @@ export function MemberRow({ uid, profile, balance, holdsFinance, actions }: Memb
   const isOwnerRow = profile.role === 'owner';
   const [confirmingRemove, setConfirmingRemove] = useState(false);
   const [editingName, setEditingName] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const { notify } = useToast();
 
   function saveName(value: string) {
@@ -79,8 +84,38 @@ export function MemberRow({ uid, profile, balance, holdsFinance, actions }: Memb
     }
   }
 
+  async function handlePhoto(file: File | undefined) {
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      const dataUri = await fileToAvatarDataUri(file);
+      await setAvatar(uid, dataUri);
+    } catch (err) {
+      notify(friendlyError(err, 'Could not update their photo. Try again in a moment.'));
+    } finally {
+      setUploadingPhoto(false);
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-border-soft py-3 last:border-b-0">
+      <button
+        type="button"
+        title={`Change ${profile.name}'s photo`}
+        disabled={uploadingPhoto}
+        onClick={() => photoInputRef.current?.click()}
+        className="cursor-pointer border-none bg-transparent p-0"
+      >
+        <Avatar name={profile.name} avatarUrl={profile.avatarUrl} size="sm" />
+      </button>
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => handlePhoto(e.target.files?.[0])}
+      />
       <div className="flex min-w-[150px] flex-1 items-center gap-2">
         {editingName ? (
           <input

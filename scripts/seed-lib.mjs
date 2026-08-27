@@ -65,4 +65,5 @@ export const DEMO_SETTINGS = {
   financeUid: null,
   votingOpen: true,
   currentWeek: '2026-W34',
+  weekPaused: false,
 };

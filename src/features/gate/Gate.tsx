@@ -1,9 +1,42 @@
+import { useEffect, useState } from 'react';
 import { getWeekLabel } from '@/lib/week';
 import { BONUS_AMOUNT } from '@/lib/constants';
+import { getRememberedCredential } from '@/lib/deviceCredential';
+import { login } from '@/services/auth.service';
 import { Button } from '@/components/ui/Button';
+import { Spinner } from '@/components/ui/Spinner';
 import { GateActions, GateBody, GateEyebrow, GateHeading, GateLink, GateLinks, GateShell } from './GateShell';
 
 export function Gate({ onVote, onSignup }: { onVote: () => void; onSignup: () => void }) {
+  // Best-effort silent sign-in from a credential the browser remembered on a
+  // previous visit — on a supported platform this is what a Face/Touch ID prompt
+  // gates. Falls straight through to the normal gate if there's nothing stored,
+  // the platform doesn't support it, or the stored credential no longer works.
+  const [trying, setTrying] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    getRememberedCredential()
+      .then((cred) => {
+        if (cancelled || !cred) return;
+        return login(cred.email, cred.secret).catch(() => {});
+      })
+      .finally(() => {
+        if (!cancelled) setTrying(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (trying) {
+    return (
+      <GateShell>
+        <Spinner label="Signing you in" />
+      </GateShell>
+    );
+  }
+
   return (
     <GateShell
       brand={

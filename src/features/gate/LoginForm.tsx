@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { forgotPassword, forgotPasswordErrorMessage, login } from '@/services/auth.service';
 import { friendlyError } from '@/lib/errors';
+import { resolveLoginSecret } from '@/lib/auth-pin';
+import { rememberCredential } from '@/lib/deviceCredential';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { useToast } from '@/hooks/useToast';
@@ -38,11 +40,13 @@ export function LoginForm({
       setError('Enter both your email and password.');
       return;
     }
-    login(email, password).catch((err: FirebaseAuthError) => {
-      setError(
-        (err.code && LOGIN_ERROR_MAP[err.code]) || friendlyError(err, 'Could not log in. Try again in a moment.'),
-      );
-    });
+    login(email, password)
+      .then(() => rememberCredential(email, resolveLoginSecret(password), email))
+      .catch((err: FirebaseAuthError) => {
+        setError(
+          (err.code && LOGIN_ERROR_MAP[err.code]) || friendlyError(err, 'Could not log in. Try again in a moment.'),
+        );
+      });
   }
 
   function handleForgot() {
