@@ -57,7 +57,8 @@ await page.waitForTimeout(600);
 await shot('01-pick-name');
 
 // 2. The vote list, open and untouched.
-await page.getByRole('button', { name: ME }).click();
+await page.getByRole('combobox').selectOption({ label: ME });
+await page.getByRole('button', { name: 'Join', exact: true }).click();
 await page.getByRole('button', { name: 'Vote', exact: true }).first().waitFor({ timeout: 20000 });
 await page.waitForTimeout(1200);
 const grid = page.locator('div.grid').first();

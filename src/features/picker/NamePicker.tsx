@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { useSession } from '@/hooks/useSession';
@@ -44,26 +43,27 @@ function BootstrapFirstRun() {
   );
 }
 
-/** Replaces the entire sign-in flow: no email, no PIN, no password. You tap your
- * name and you're in.
+/** Replaces the entire sign-in flow: no email, no PIN, no password. Pick your name
+ * from the dropdown and you're in.
  *
- * A name can only be taken once — the first browser to claim it owns it, and it
- * shows as taken to everyone else from then on. That's enforced by firestore.rules
- * (the claim doc is create-only), not just greyed out here, so nobody can vote as
- * someone who's already claimed by tapping past the UI. */
+ * Only names nobody has claimed yet show up as options — once someone's picked a
+ * name, it drops out of the list here for everyone else, rather than staying visible
+ * as a disabled row. That's cosmetic, not the actual guard: firestore.rules is what
+ * stops the claim doc itself from being taken twice. */
 export function NamePicker() {
   const { profiles, claims, loadedProfiles, loadedClaims, claimName, loadErrorMsg } = useSession();
-  const [pendingUid, setPendingUid] = useState<string | null>(null);
+  const [selected, setSelected] = useState('');
+  const [joining, setJoining] = useState(false);
   const { notify } = useToast();
 
-  async function pick(uid: string) {
-    setPendingUid(uid);
+  async function join() {
+    if (!selected) return;
+    setJoining(true);
     try {
-      await claimName(uid);
+      await claimName(selected);
     } catch (err) {
       notify(friendlyError(err, 'Could not take that name. Try again in a moment.'));
-    } finally {
-      setPendingUid(null);
+      setJoining(false);
     }
   }
 
@@ -75,7 +75,9 @@ export function NamePicker() {
     );
   }
 
-  const rows = Object.entries(profiles).sort((a, b) => a[1].name.localeCompare(b[1].name));
+  const available = Object.entries(profiles)
+    .filter(([uid]) => !claims[uid])
+    .sort((a, b) => a[1].name.localeCompare(b[1].name));
 
   return (
     <PickerShell
@@ -87,53 +89,36 @@ export function NamePicker() {
         </>
       }
     >
-      <p className="m-0 mb-1.5 text-center font-display text-lg font-bold text-text">Who are you?</p>
-      <p className="m-0 mb-6 text-center text-sm leading-relaxed text-text-muted">
-        Tap your name to start voting. Once you pick it, it's yours — nobody else can vote as you.
-      </p>
+      <p className="m-0 mb-6 text-center font-display text-lg font-bold text-text">Who are you?</p>
 
-      {rows.length === 0 ? (
+      {Object.keys(profiles).length === 0 ? (
         <BootstrapFirstRun />
+      ) : available.length === 0 ? (
+        <p className="m-0 rounded-xl border border-dashed border-border px-4 py-6 text-center text-[13px] leading-relaxed text-text-muted">
+          Everyone's already picked a name. Ask {HOST_NAME} to free yours up if that's not you.
+        </p>
       ) : (
-        <ul className="m-0 flex list-none flex-col gap-2 p-0">
-          {rows.map(([uid, profile]) => {
-            const taken = !!claims[uid];
-            const busy = pendingUid === uid;
-            return (
-              <li key={uid}>
-                <button
-                  type="button"
-                  disabled={taken || !!pendingUid}
-                  onClick={() => pick(uid)}
-                  className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-[transform,border-color] ${
-                    taken
-                      ? 'cursor-not-allowed border-border-soft bg-transparent opacity-45'
-                      : 'cursor-pointer border-border bg-bg-card hover:-translate-y-0.5 hover:border-accent disabled:cursor-wait'
-                  }`}
-                >
-                  <Avatar name={profile.name} avatarUrl={profile.avatarUrl} size="sm" />
-                  <span className="min-w-0 flex-1 font-display text-[15px] font-semibold [overflow-wrap:anywhere]">
-                    {profile.name}
-                    {isHostName(profile.name) && (
-                      <span className="ml-1.5 font-mono text-[10px] font-normal uppercase tracking-[0.08em] text-text-muted">
-                        runs the reveal
-                      </span>
-                    )}
-                  </span>
-                  <span className="shrink-0 font-mono text-[11px] uppercase tracking-[0.06em] text-text-muted">
-                    {busy ? 'Taking…' : taken ? 'Taken' : ''}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <select
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+            className="min-h-12 min-w-0 flex-1 rounded-xl border border-border bg-bg-elevated px-3.5 text-base text-text focus:border-accent focus:outline-none"
+          >
+            <option value="" disabled className="bg-bg-elevated text-text">
+              Select your name
+            </option>
+            {available.map(([uid, profile]) => (
+              <option key={uid} value={uid} className="bg-bg-elevated text-text">
+                {profile.name}
+                {isHostName(profile.name) ? ' — runs the reveal' : ''}
+              </option>
+            ))}
+          </select>
+          <Button variant="gate" className="w-auto sm:w-[140px]" disabled={!selected || joining} onClick={join}>
+            {joining ? 'Joining…' : 'Join'}
+          </Button>
+        </div>
       )}
-
-      <p className="m-0 mt-6 border-t border-border-soft pt-5 text-center text-xs leading-relaxed text-text-muted">
-        Name already taken but it's actually you? Ask KG to free it up — that happens if you've cleared your browser
-        or switched phones.
-      </p>
     </PickerShell>
   );
 }

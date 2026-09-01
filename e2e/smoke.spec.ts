@@ -41,11 +41,14 @@ test('the app boots straight into the name picker, with nothing to sign in to', 
 
   if (await picker.isVisible()) {
     await expect(page.getByText('Who are you?')).toBeVisible();
-    // An empty roster is a rendered state, not a failure — which is what keeps this
-    // test free of any seeding requirement.
+    // Three legitimate rendered states, and the test has to accept all of them
+    // without seeding anything: an empty roster (the bootstrap button), a roster
+    // with names still free (the dropdown), or one where everyone's already
+    // claimed (the "everyone's already picked" message).
     const emptyRoster = page.getByText(/Nobody.s on the roster yet/);
-    const rosterRows = page.getByRole('listitem');
-    await expect(emptyRoster.or(rosterRows.first())).toBeVisible();
+    const dropdown = page.getByRole('combobox');
+    const allTaken = page.getByText(/Everyone.s already picked a name/);
+    await expect(emptyRoster.or(dropdown).or(allTaken)).toBeVisible();
   }
 
   // The rewrite removed every credential surface. Asserting their absence is what

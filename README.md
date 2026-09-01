@@ -41,7 +41,7 @@ setup and configuration.
 
 There is no sign-in screen, and no sign-in of any kind behind it either — no
 email, no password, no PIN, no signup, not even the invisible anonymous-auth
-kind. You open the app, tap your name on the roster, and you're voting. Which
+kind. You open the app, pick your name from the dropdown, and you're voting. Which
 name you've claimed is remembered by your own browser
 (`src/lib/localIdentity.ts`, plain `localStorage`) — there's no account behind
 it, and nothing server-side ties a name to the person tapping it.

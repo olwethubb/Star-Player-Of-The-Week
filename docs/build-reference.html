@@ -152,7 +152,7 @@
     <div class="diagram">
       <div class="node"><p class="node-label">Browser</p><p class="node-name">React app</p><p class="node-sub">built by Vite</p></div>
       <div class="arrow"></div>
-      <div class="node"><p class="node-label">Who you are</p><p class="node-name">Tap your name</p><p class="node-sub">remembered locally, nothing to sign into</p></div>
+      <div class="node"><p class="node-label">Who you are</p><p class="node-name">Pick your name</p><p class="node-sub">remembered locally, nothing to sign into</p></div>
       <div class="arrow"></div>
       <div class="node"><p class="node-label">Data</p><p class="node-name">Firestore</p><p class="node-sub">updates live</p></div>
       <div class="arrow"></div>
@@ -248,8 +248,9 @@ firebase deploy <span class="flag">--only hosting,firestore:rules</span></div>
       <div class="log-entry"><p class="log-title">Security check-up</p><p>A full review found and fixed real gaps — including a way anyone could inflate vote counts.</p></div>
       <div class="log-entry"><p class="log-title">Made the session controls self-serve</p><p>Adding, renaming and removing people, opening and closing voting, and recovering from a stuck state can now all be done from the app — no direct database edit needed.</p></div>
       <div class="log-entry"><p class="log-title">Stats up or down, streaks, photos</p><p>Everyone says whether their stats are up before they vote, and only "up" goes on the poll. Photos, a badge for anyone who's received votes three weeks running, and a "pause this week" switch for holidays landed alongside it.</p></div>
-      <div class="log-entry"><p class="log-title">Stripped back to just the vote</p><p>Accounts and the Blacfox Dollars wallet are gone, and every screen that wasn't the vote went with them. Open the app, tap your name, vote — that's the whole app now.</p></div>
-      <div class="log-entry"><p class="log-title">Dropped the last trace of sign-in</p><p>Even the invisible kind — tapping your name used to hand your browser an anonymous Firebase identity behind the scenes, purely so the rules could enforce one name per browser. With nothing left worth protecting that way, that step is gone too, and "who you are" now just lives in your own browser's storage. The trade: one name per person is a convention the app follows now, not something the database can verify.</p></div>
+      <div class="log-entry"><p class="log-title">Stripped back to just the vote</p><p>Accounts and the Blacfox Dollars wallet are gone, and every screen that wasn't the vote went with them. Open the app, pick your name, vote — that's the whole app now.</p></div>
+      <div class="log-entry"><p class="log-title">Dropped the last trace of sign-in</p><p>Even the invisible kind — picking your name used to hand your browser an anonymous Firebase identity behind the scenes, purely so the rules could enforce one name per browser. With nothing left worth protecting that way, that step is gone too, and "who you are" now just lives in your own browser's storage. The trade: one name per person is a convention the app follows now, not something the database can verify.</p></div>
+      <div class="log-entry"><p class="log-title">Picker became a dropdown</p><p>The roster used to be a list of tap-to-claim cards. It's a select-and-join dropdown now, and a name drops out of the list entirely the moment someone takes it, rather than staying visible as a disabled row.</p></div>
     </div>
   </section>
 
