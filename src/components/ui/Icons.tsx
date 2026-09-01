@@ -24,6 +24,14 @@ export function IconCheck(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function IconChevronDown(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" strokeWidth={2.5} {...base} {...props}>
+      <polyline points="6,9 12,15 18,9" />
+    </svg>
+  );
+}
+
 export function IconTrophy(props: SVGProps<SVGSVGElement>) {
   return (
     <svg width={40} height={40} viewBox="0 0 24 24" strokeWidth={1.5} {...base} {...props}>

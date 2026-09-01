@@ -16,6 +16,8 @@ export default {
         'accent-contrast': 'var(--accent-contrast)',
         'on-dark': 'var(--on-dark)',
         'on-dark-muted': 'var(--on-dark-muted)',
+        'on-dark-surface': 'var(--on-dark-surface)',
+        'on-dark-surface-border': 'var(--on-dark-surface-border)',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

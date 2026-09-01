@@ -1,12 +1,14 @@
 import { useState } from 'react';
+import * as Select from '@radix-ui/react-select';
 import { Button } from '@/components/ui/Button';
+import { IconCheck, IconChevronDown } from '@/components/ui/Icons';
 import { Spinner } from '@/components/ui/Spinner';
 import { useSession } from '@/hooks/useSession';
 import { useToast } from '@/hooks/useToast';
 import { friendlyError } from '@/lib/errors';
 import { getWeekLabel } from '@/lib/week';
 import { addTeammate } from '@/services/profiles.service';
-import { HOST_NAME, isHostName } from '@/types/firestore';
+import { HOST_NAME, isHostName, type Profile } from '@/types/firestore';
 import { PickerBody, PickerEyebrow, PickerHeading, PickerShell } from './PickerShell';
 
 /** A brand-new project has no roster and no host — nobody can claim a name that
@@ -40,6 +42,74 @@ function BootstrapFirstRun() {
         {starting ? 'Setting up…' : `I'll be ${HOST_NAME} and add the team`}
       </Button>
     </div>
+  );
+}
+
+/** A dropdown built from Radix's unstyled Select primitive instead of a native
+ * `<select>`. The native element's closed box can be themed, but the OPEN popup is
+ * rendered by the browser's own OS chrome — flat white, system font, a boring grey
+ * highlight — no CSS reaches it. Radix's version renders its popup as a normal
+ * portaled DOM node this app fully controls, so it can actually look like the rest
+ * of the app instead of a jarring, unstyled system dialog dropped on top of it. */
+function NameSelect({
+  available,
+  value,
+  onChange,
+}: {
+  available: [string, Profile][];
+  value: string;
+  onChange: (uid: string) => void;
+}) {
+  const selectedName = available.find(([uid]) => uid === value)?.[1]?.name;
+
+  return (
+    <Select.Root value={value} onValueChange={onChange}>
+      <Select.Trigger className="flex min-h-12 min-w-0 flex-1 items-center justify-between gap-2 rounded-xl border border-border bg-bg-elevated px-3.5 text-base text-text outline-none transition-colors data-[placeholder]:text-text-muted data-[state=open]:border-accent">
+        <Select.Value placeholder="Select your name">{selectedName}</Select.Value>
+        <Select.Icon className="text-text-muted">
+          <IconChevronDown />
+        </Select.Icon>
+      </Select.Trigger>
+      <Select.Portal>
+        {/* bg-on-dark-surface etc., not bg-bg-card/text-text: this content portals
+            straight to document.body, outside the DOM subtree PickerShell's
+            .gate-glass-card scopes those tokens within. Root-level on-dark-surface
+            resolves correctly regardless — see tokens.css. */}
+        <Select.Content
+          position="popper"
+          sideOffset={8}
+          className="z-[100] w-[var(--radix-select-trigger-width)] overflow-hidden rounded-2xl border border-on-dark-surface-border bg-on-dark-surface shadow-[0_20px_44px_-12px_rgba(0,0,0,0.6)] data-[state=open]:animate-fadein"
+        >
+          <Select.ScrollUpButton className="flex h-6 cursor-default items-center justify-center bg-on-dark-surface text-on-dark-muted">
+            <IconChevronDown className="rotate-180" />
+          </Select.ScrollUpButton>
+          <Select.Viewport className="max-h-[min(320px,60vh)] p-1.5">
+            {available.map(([uid, profile]) => (
+              <Select.Item
+                key={uid}
+                value={uid}
+                className="flex cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-[15px] text-on-dark outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-contrast"
+              >
+                <Select.ItemText>{profile.name}</Select.ItemText>
+                <span className="flex items-center gap-2">
+                  {isHostName(profile.name) && (
+                    <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.06em] opacity-70">
+                      runs the reveal
+                    </span>
+                  )}
+                  <Select.ItemIndicator>
+                    <IconCheck />
+                  </Select.ItemIndicator>
+                </span>
+              </Select.Item>
+            ))}
+          </Select.Viewport>
+          <Select.ScrollDownButton className="flex h-6 cursor-default items-center justify-center bg-on-dark-surface text-on-dark-muted">
+            <IconChevronDown />
+          </Select.ScrollDownButton>
+        </Select.Content>
+      </Select.Portal>
+    </Select.Root>
   );
 }
 
@@ -99,30 +169,7 @@ export function NamePicker() {
         </p>
       ) : (
         <div className="flex flex-col gap-3 sm:flex-row">
-          <select
-            value={selected}
-            onChange={(e) => setSelected(e.target.value)}
-            className="min-h-12 min-w-0 flex-1 rounded-xl border border-border bg-bg-elevated px-3.5 text-base text-text focus:border-accent focus:outline-none"
-          >
-            {/* The closed box sits on the picker's dark glass card, so it needs the
-                light "on dark" text this scope provides via text-text above. The
-                OPEN dropdown list is a different story: browsers render that popup
-                with their own (usually white) chrome and ignore a custom background
-                on it, while still applying whatever text color we set — so light
-                text here would be near-invisible on a white popup. These options
-                get a color that doesn't depend on the dark-card scope at all,
-                matching the app's normal (light-background) theme instead, because
-                that's the reality of what actually renders. */}
-            <option value="" disabled style={{ color: '#201a14', backgroundColor: '#ffffff' }}>
-              Select your name
-            </option>
-            {available.map(([uid, profile]) => (
-              <option key={uid} value={uid} style={{ color: '#201a14', backgroundColor: '#ffffff' }}>
-                {profile.name}
-                {isHostName(profile.name) ? ' — runs the reveal' : ''}
-              </option>
-            ))}
-          </select>
+          <NameSelect available={available} value={selected} onChange={setSelected} />
           <Button variant="gate" className="w-auto sm:w-[140px]" disabled={!selected || joining} onClick={join}>
             {joining ? 'Joining…' : 'Join'}
           </Button>

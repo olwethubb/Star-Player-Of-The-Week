@@ -12,6 +12,17 @@
      --text/--text-muted pair would be invisible. */
   --on-dark: #fff8f0;
   --on-dark-muted: rgba(255, 248, 240, 0.74);
+  /* A solid dark surface to sit BEHIND on-dark text — for anything that renders on
+     the gate screen but outside the DOM subtree .gate-glass-card scopes its color
+     variables to, most notably a Radix popover/select's content, which portals
+     straight to document.body. Inside that subtree, --bg-card/--text are locally
+     overridden to the on-dark pair and this token is never needed; anywhere a
+     portal escapes that subtree, --bg-card would otherwise resolve back to the
+     page's normal light-theme white, invisible against on-dark text. Root-level
+     (not scoped), so it resolves correctly regardless of where in the DOM it's
+     used. */
+  --on-dark-surface: #2a1f16;
+  --on-dark-surface-border: rgba(255, 248, 240, 0.16);
   --accent-glow-35: color-mix(in srgb, var(--accent) 35%, transparent);
   --accent-glow-55: color-mix(in srgb, var(--accent) 55%, transparent);
   /* The reveal wheel's alternating wedge colors are their own tokens, not aliases of
