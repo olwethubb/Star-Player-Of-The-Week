@@ -1,23 +1,30 @@
-/** Admin-only, shown while voting is open — a live count of how many votes have
- * been cast so far, so an admin can judge when it's worth ending voting instead of
- * flying blind. Deliberately never breaks the count down by candidate; that stays
- * hidden (Scoreboard) until results are revealed. */
+import type { Voter } from '@/types/firestore';
+
+/** Host-only, shown while voting is open — how many people have voted so far, so the
+ * host can judge when it's worth closing rather than flying blind.
+ *
+ * This counts voter markers, which record only THAT someone voted. There is nothing
+ * to break down by candidate here even in principle: the per-candidate counts live
+ * in a separate collection the rules won't open until voting closes, and who-voted-
+ * for-whom is never stored at all. */
 export function VotingProgress({
-  tally,
-  loadedTally,
-  teammateCount,
+  voters,
+  weekKey,
+  eligibleCount,
 }: {
-  tally: Record<string, number>;
-  loadedTally: boolean;
-  teammateCount: number;
+  voters: Record<string, Voter>;
+  weekKey: string | null;
+  eligibleCount: number;
 }) {
-  if (!loadedTally) return null;
-  const votesCast = Object.values(tally).reduce((sum, n) => sum + n, 0);
+  const votesCast = Object.values(voters).filter((v) => v.weekKey === weekKey).length;
+  const total = Math.max(eligibleCount, votesCast);
 
   return (
     <div className="mb-5 flex items-center gap-2 rounded-xl border border-border-soft bg-bg-elevated px-4 py-3 text-[13px] text-text-muted">
       <span className="font-mono text-sm font-bold text-accent">{votesCast}</span>
-      <span>of {teammateCount} teammates have voted so far.</span>
+      <span>
+        of {total} {total === 1 ? 'person has' : 'people have'} voted so far.
+      </span>
     </div>
   );
 }

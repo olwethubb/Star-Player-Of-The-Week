@@ -8,19 +8,21 @@ interface VoteGridProps {
   votingOpen: boolean;
   weekPaused: boolean;
   others: [string, Profile][];
-  myVote: string | null;
+  /** Read from this browser's own storage, not the server — nothing server-side
+   * records who you picked. See lib/localPick.ts. */
+  myPick: string | null;
   pendingUid: string | null;
   onVote: (uid: string) => void;
 }
 
-export function VoteGrid({ votingOpen, weekPaused, others, myVote, pendingUid, onVote }: VoteGridProps) {
+export function VoteGrid({ votingOpen, weekPaused, others, myPick, pendingUid, onVote }: VoteGridProps) {
   const streaks = useStreaks();
 
   if (weekPaused) {
     return <EmptyState icon={<IconLock />}>No vote this week — see you next Friday!</EmptyState>;
   }
   if (!votingOpen) {
-    return <EmptyState icon={<IconLock />}>Voting hasn't opened yet this week. Check back once an admin opens it.</EmptyState>;
+    return <EmptyState icon={<IconLock />}>Voting hasn't opened yet this week. Check back once KG opens it.</EmptyState>;
   }
   if (others.length === 0) {
     return <EmptyState icon={<IconUsers />}>Add more teammates below before voting can start.</EmptyState>;
@@ -30,7 +32,7 @@ export function VoteGrid({ votingOpen, weekPaused, others, myVote, pendingUid, o
     <>
       <div className="mb-6 grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
         {others.map(([uid, p]) => {
-          const voted = myVote === uid;
+          const voted = myPick === uid;
           const streak = streaks[uid];
           return (
             <div
@@ -65,8 +67,8 @@ export function VoteGrid({ votingOpen, weekPaused, others, myVote, pendingUid, o
       <div className="mb-6 flex items-start gap-2.5 rounded-xl border border-border-soft bg-bg-elevated px-4 py-3 text-[13px] leading-relaxed text-text-muted">
         <IconLock className="mt-0.5 text-text-muted" />
         <span>
-          {myVote ? 'Your vote is locked in.' : "You haven't voted yet."} Only admins can reveal the results, and
-          only once they choose to.
+          {myPick ? 'Your vote is in — tap another name to change it.' : "You haven't voted yet."} Who you picked is
+          never sent anywhere: KG sees the totals once voting closes, never the names behind them.
         </span>
       </div>
     </>

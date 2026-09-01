@@ -10,18 +10,7 @@ import {
   type DocumentReference,
   type FirestoreDataConverter,
 } from 'firebase/firestore';
-import type {
-  Balance,
-  BalanceAdjustment,
-  MyVote,
-  Payout,
-  PayoutRequest,
-  Profile,
-  Settings,
-  StatDeclaration,
-  Tally,
-  WeeklyActivity,
-} from '@/types/firestore';
+import type { Claim, Host, Profile, Settings, StatDeclaration, Tally, Voter, WeeklyActivity } from '@/types/firestore';
 
 function requiredEnv(key: string): string {
   const value = import.meta.env[key];
@@ -44,8 +33,8 @@ export const app = initializeApp(firebaseConfig);
 
 /** Set VITE_USE_EMULATORS=1 to point a local dev server at the Firebase emulators
  * instead of the real project — needed to work on screens whose data doesn't exist
- * in production right now (an open vote, a pending cash-out) without mutating real
- * votes or balances to get there. Never set in a deployed build. */
+ * in production right now (an open vote, a revealed week) without mutating real
+ * votes to get there. Never set in a deployed build. */
 const useEmulators = import.meta.env.VITE_USE_EMULATORS === '1';
 
 // App Check is optional and only activates once VITE_RECAPTCHA_SITE_KEY is set — it
@@ -60,6 +49,10 @@ if (recaptchaSiteKey && !useEmulators) {
   });
 }
 
+/** Anonymous auth only — nobody ever sees a sign-in screen or types a credential.
+ * Its single job is to give each browser a stable uid that firestore.rules can
+ * check, which is what turns "OB is taken" into something the database enforces
+ * rather than something the UI merely displays. See services/claims.service.ts. */
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
@@ -82,12 +75,9 @@ function col<T>(path: string): CollectionReference<T> {
 }
 
 export const profilesCol = col<Profile>('sotw_profiles');
-export const balancesCol = col<Balance>('sotw_balances');
-export const myVoteCol = col<MyVote>('sotw_myvote');
+export const claimsCol = col<Claim>('sotw_claims');
 export const tallyCol = col<Tally>('sotw_tally');
-export const payoutRequestsCol = col<PayoutRequest>('sotw_payout_requests');
-export const payoutsCol = col<Payout>('sotw_payouts');
-export const balanceAdjustmentsCol = col<BalanceAdjustment>('sotw_balance_adjustments');
+export const votersCol = col<Voter>('sotw_voters');
 export const statStatusCol = col<StatDeclaration>('sotw_stat_status');
 export const weeklyActivityCol = col<WeeklyActivity>('sotw_weekly_activity');
 
@@ -95,17 +85,19 @@ export const settingsRef: DocumentReference<Settings> = doc(db, 'sotw_meta', 'se
   passthrough<Settings>(),
 );
 
+export const hostRef: DocumentReference<Host> = doc(db, 'sotw_meta', 'host').withConverter(passthrough<Host>());
+
 export function profileRef(uid: string): DocumentReference<Profile> {
   return doc(profilesCol, uid);
 }
-export function balanceRef(uid: string): DocumentReference<Balance> {
-  return doc(balancesCol, uid);
-}
-export function myVoteRef(uid: string): DocumentReference<MyVote> {
-  return doc(myVoteCol, uid);
+export function claimRef(uid: string): DocumentReference<Claim> {
+  return doc(claimsCol, uid);
 }
 export function tallyRef(uid: string): DocumentReference<Tally> {
   return doc(tallyCol, uid);
+}
+export function voterRef(uid: string): DocumentReference<Voter> {
+  return doc(votersCol, uid);
 }
 export function statStatusRef(uid: string): DocumentReference<StatDeclaration> {
   return doc(statStatusCol, uid);

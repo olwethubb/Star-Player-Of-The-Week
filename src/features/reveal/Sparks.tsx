@@ -24,7 +24,7 @@ let nextId = 0;
 
 /** A one-shot burst of rising particles, launched once when the winner lands —
  * denser than a typical UI flourish since this is standing in for the payoff of
- * an actual cash bonus, not just a decorative accent. */
+ * a real moment, not just a decorative accent. */
 export function Sparks() {
   const [sparks, setSparks] = useState<Spark[]>([]);
 

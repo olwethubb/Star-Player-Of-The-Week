@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useDoReveal, useForceUnlockReveal, useSessionControls } from '@/hooks/useVotingActions';
-import type { Profile } from '@/types/firestore';
 
 const STUCK_LOCK_GRACE_MS = 15_000;
 
@@ -58,22 +57,20 @@ function StuckRevealBanner({ revealing }: { revealing: boolean }) {
   );
 }
 
-/** Only an admin can open/close the voting window or trigger a reveal — and reveal is
+/** Only the host can open/close the voting window or trigger a reveal — and reveal is
  * only offered once voting is closed, so results can't be tallied while votes are
  * still trickling in. */
 export function SessionControls({
   votingOpen,
   weekPaused,
   revealing,
-  profiles,
 }: {
   votingOpen: boolean;
   weekPaused: boolean;
   revealing: boolean;
-  profiles: Record<string, Profile>;
 }) {
   const { start, end, pauseWeek, resumeWeek, pending: sessionPending } = useSessionControls();
-  const { reveal, pending: revealPending } = useDoReveal(profiles);
+  const { reveal, pending: revealPending } = useDoReveal();
   const [confirmingEnd, setConfirmingEnd] = useState(false);
 
   if (votingOpen) {
@@ -86,7 +83,7 @@ export function SessionControls({
           open={confirmingEnd}
           onOpenChange={setConfirmingEnd}
           title="End voting now?"
-          description="Nobody will be able to vote again until you start a new session."
+          description="Nobody will be able to vote again until you start a new session. You'll then see the totals."
           confirmLabel="End Voting"
           onConfirm={end}
         />

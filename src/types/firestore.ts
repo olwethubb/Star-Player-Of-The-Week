@@ -1,28 +1,49 @@
 import type { Timestamp } from 'firebase/firestore';
 
-export type Role = 'owner' | 'admin' | 'member';
-
+/** A teammate on the roster. Deliberately has no email, no role and no balance —
+ * this app does nothing but run the weekly vote, so a name and a face is the whole
+ * of what it needs to know about anyone. */
 export interface Profile {
   name: string;
-  email: string;
-  role: Role;
-  selfSignup?: boolean;
   /** A small compressed data URI (see lib/avatar.ts) — deliberately not a Storage
    * file, so avatars work without standing up Cloud Storage for the project. */
   avatarUrl?: string;
 }
 
-export interface Balance {
-  balance: number;
+/** Binds one roster name to one browser, so two people can't both be "OB".
+ * `authUid` is an anonymous Firebase Auth uid — nobody signs in or types anything,
+ * it's just a stable per-browser identity the security rules can actually check.
+ * Without a server-checkable identity here, "this name is taken" would be a UI
+ * suggestion that anyone could click straight past. First write wins: the doc is
+ * create-only, so whoever's transaction lands first owns the name. */
+export interface Claim {
+  authUid: string;
+  claimedAt: Timestamp | null;
 }
 
-export interface MyVote {
-  votedForUid: string;
-  ts: Timestamp | null;
+/** Written by whoever claims the profile named KG, and the single doc the security
+ * rules consult to answer "is this caller the host". Rules can't run a query to go
+ * find the profile called KG, so the host records themselves here instead — and the
+ * write is guarded on actually holding that claim. */
+export interface Host {
+  authUid: string;
+  profileUid: string;
 }
 
 export interface Tally {
   count: number;
+}
+
+/** Proof that someone has voted this week — and deliberately NOTHING else.
+ *
+ * There is no field here for who they picked, and no other collection records it
+ * either: your own pick is written only to your browser's localStorage. That's what
+ * makes "the host sees the numbers but never who voted for who" a property of the
+ * data model rather than a promise the UI makes. Even someone reading the raw
+ * database can only learn that you voted, never for whom. */
+export interface Voter {
+  weekKey: string;
+  ts: Timestamp | null;
 }
 
 export interface Settings {
@@ -30,15 +51,14 @@ export interface Settings {
   revealing: boolean;
   winnerUids: string[];
   totalVotes: number;
-  /** Non-null while a runoff round is the active vote: everyone (except admins) can
-   * still vote, but only for one of these uids — the ones who tied last round. Null
-   * outside of a runoff, including during a normal week's voting. */
+  /** Non-null while a runoff round is the active vote: everyone (except the host)
+   * can still vote, but only for one of these uids — the ones who tied last round.
+   * Null outside of a runoff, including during a normal week's voting. */
   runoffUids: string[] | null;
-  financeUid: string | null;
   votingOpen: boolean;
   currentWeek: string | null;
-  /** An admin marked this week as intentionally skipped (holiday, etc.) — shown
-   * instead of the ambiguous "voting hasn't opened yet", which reads as "the admin
+  /** The host marked this week as intentionally skipped (holiday, etc.) — shown
+   * instead of the ambiguous "voting hasn't opened yet", which reads as "the host
    * forgot" rather than "nothing was scheduled this week". Cleared on rollover. */
   weekPaused: boolean;
 }
@@ -49,43 +69,10 @@ export const DEFAULT_SETTINGS: Settings = {
   winnerUids: [],
   totalVotes: 0,
   runoffUids: null,
-  financeUid: null,
   votingOpen: false,
   currentWeek: null,
   weekPaused: false,
 };
-
-export type PayoutStatus = 'pending' | 'paid' | 'rejected' | 'cancelled';
-
-export interface PayoutRequest {
-  uid: string;
-  name: string;
-  amount: number;
-  status: PayoutStatus;
-  requestedAt: Timestamp | null;
-  resolvedAt: Timestamp | null;
-  resolvedBy: string | null;
-}
-
-export interface Payout {
-  uid: string;
-  name: string;
-  amount: number;
-  week: string;
-  ts: Timestamp | null;
-}
-
-/** Append-only audit trail for manual balance edits from the team panel — so
- * "why is this balance what it is" is answerable from the app, not by asking
- * whoever built it to go look in Firestore. Payouts/bonuses already have their
- * own log (Payout above); this covers the other way a balance changes. */
-export interface BalanceAdjustment {
-  uid: string;
-  from: number;
-  to: number;
-  adjustedBy: string;
-  ts: Timestamp | null;
-}
 
 export type StatLevel = 'up' | 'down';
 
@@ -109,18 +96,17 @@ export interface WeeklyActivity {
   received: boolean;
 }
 
-export function isAdmin(profile: Profile | null | undefined): boolean {
-  return !!profile && (profile.role === 'owner' || profile.role === 'admin');
+/** Whoever claims this name runs the session: they don't vote, they open and close
+ * voting, and they're the only one who sees the per-person counts (so they can
+ * commentate on who's leading, or call a tie). It's matched on the roster name
+ * rather than a stored flag because that's the whole rule — "whoever picks KG
+ * reveals" — and it keeps the roster free of admin plumbing. */
+export const HOST_NAME = 'KG';
+
+export function isHostName(name: string | null | undefined): boolean {
+  return !!name && name.trim().toLowerCase() === HOST_NAME.toLowerCase();
 }
 
-export function isFinanceUid(settings: Settings | null, uid: string | null | undefined): boolean {
-  return !!uid && !!settings && settings.financeUid === uid;
-}
-
-export function canManagePayouts(
-  profile: Profile | null | undefined,
-  uid: string | null | undefined,
-  settings: Settings | null,
-): boolean {
-  return isAdmin(profile) || isFinanceUid(settings, uid);
+export function isHostProfile(profile: Profile | null | undefined): boolean {
+  return isHostName(profile?.name);
 }

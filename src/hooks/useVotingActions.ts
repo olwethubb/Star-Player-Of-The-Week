@@ -2,24 +2,29 @@ import { useCallback, useState } from 'react';
 import * as votingService from '@/services/voting.service';
 import { friendlyError } from '@/lib/errors';
 import { useToast } from '@/hooks/useToast';
-import type { Profile } from '@/types/firestore';
+import { useSession } from '@/hooks/useSession';
 
-export function useCastVote(myUid: string, votingOpen: boolean) {
+export function useCastVote() {
+  const { myUid, myPick, setMyPick, settings } = useSession();
   const { notify } = useToast();
   const [pendingUid, setPendingUid] = useState<string | null>(null);
 
   const castVote = useCallback(
     async (forUid: string) => {
+      if (!myUid) return;
       setPendingUid(forUid);
       try {
-        await votingService.castVote(myUid, forUid, votingOpen);
+        // The previous pick has to be handed in from here rather than read back from
+        // the server — the server has never known it. See services/voting.service.ts.
+        await votingService.castVote(myUid, forUid, myPick, settings.currentWeek, !!settings.votingOpen);
+        setMyPick(forUid);
       } catch (err) {
         notify(friendlyError(err, 'Could not cast your vote. Try again in a moment.'));
       } finally {
         setPendingUid(null);
       }
     },
-    [myUid, votingOpen, notify],
+    [myUid, myPick, setMyPick, settings.currentWeek, settings.votingOpen, notify],
   );
 
   return { castVote, pendingUid };
@@ -29,54 +34,37 @@ export function useSessionControls() {
   const { notify } = useToast();
   const [pending, setPending] = useState(false);
 
-  const start = useCallback(async () => {
-    setPending(true);
-    try {
-      await votingService.startVoting();
-    } catch (err) {
-      notify(friendlyError(err, 'Could not start voting. Try again in a moment.'));
-    } finally {
-      setPending(false);
-    }
-  }, [notify]);
+  const run = useCallback(
+    async (action: () => Promise<unknown>, failure: string) => {
+      setPending(true);
+      try {
+        await action();
+      } catch (err) {
+        notify(friendlyError(err, failure));
+      } finally {
+        setPending(false);
+      }
+    },
+    [notify],
+  );
 
-  const end = useCallback(async () => {
-    setPending(true);
-    try {
-      await votingService.endVoting();
-    } catch (err) {
-      notify(friendlyError(err, 'Could not end voting. Try again in a moment.'));
-    } finally {
-      setPending(false);
-    }
-  }, [notify]);
-
-  const pauseWeek = useCallback(async () => {
-    setPending(true);
-    try {
-      await votingService.pauseWeek();
-    } catch (err) {
-      notify(friendlyError(err, 'Could not pause this week. Try again in a moment.'));
-    } finally {
-      setPending(false);
-    }
-  }, [notify]);
-
-  const resumeWeek = useCallback(async () => {
-    setPending(true);
-    try {
-      await votingService.resumeWeek();
-    } catch (err) {
-      notify(friendlyError(err, 'Could not resume this week. Try again in a moment.'));
-    } finally {
-      setPending(false);
-    }
-  }, [notify]);
-
-  return { start, end, pauseWeek, resumeWeek, pending };
+  return {
+    start: useCallback(() => run(votingService.startVoting, 'Could not start voting. Try again in a moment.'), [run]),
+    end: useCallback(() => run(votingService.endVoting, 'Could not end voting. Try again in a moment.'), [run]),
+    pauseWeek: useCallback(
+      () => run(votingService.pauseWeek, 'Could not pause this week. Try again in a moment.'),
+      [run],
+    ),
+    resumeWeek: useCallback(
+      () => run(votingService.resumeWeek, 'Could not resume this week. Try again in a moment.'),
+      [run],
+    ),
+    pending,
+  };
 }
 
-export function useDoReveal(profiles: Record<string, Profile>) {
+export function useDoReveal() {
+  const { profiles } = useSession();
   const { notify } = useToast();
   const [pending, setPending] = useState(false);
 
@@ -85,7 +73,9 @@ export function useDoReveal(profiles: Record<string, Profile>) {
     try {
       const done = await votingService.doReveal(profiles);
       if (!done) {
-        notify('Nothing happened — this week may already be revealed, or another reveal is in progress. Try again in a moment.');
+        notify(
+          'Nothing happened — this week may already be revealed, or a reveal is in progress. Try again in a moment.',
+        );
       }
     } catch (err) {
       notify(friendlyError(err, 'Could not reveal the results. Try again in a moment.'));

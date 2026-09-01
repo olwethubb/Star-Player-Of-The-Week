@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import { getDocs, query, where } from 'firebase/firestore';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -7,71 +6,22 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useTeamActions } from '@/hooks/useTeamActions';
 import { useToast } from '@/hooks/useToast';
 import { friendlyError } from '@/lib/errors';
-import { balanceAdjustmentsCol } from '@/lib/firebase';
 import { fileToAvatarDataUri } from '@/lib/avatar';
-import { forgotPassword } from '@/services/auth.service';
 import { setAvatar } from '@/services/profiles.service';
-import type { BalanceAdjustment, Profile } from '@/types/firestore';
+import { isHostName, type Profile } from '@/types/firestore';
 
 interface MemberRowProps {
   uid: string;
   profile: Profile;
-  balance: number;
-  holdsFinance: boolean;
+  /** Someone's browser currently holds this name, so nobody else can vote as them. */
+  claimed: boolean;
+  isMe: boolean;
   actions: ReturnType<typeof useTeamActions>;
 }
 
-/** Fetched on demand (not a live subscription — this is rarely-viewed audit
- * detail, not something that needs to be always-on for every row). A plain
- * equality filter with no orderBy avoids needing a composite index; the
- * handful of results are sorted client-side instead. */
-function BalanceHistory({ uid }: { uid: string }) {
-  const [entries, setEntries] = useState<BalanceAdjustment[] | null>(null);
-  const { notify } = useToast();
-
-  async function load() {
-    try {
-      const snap = await getDocs(query(balanceAdjustmentsCol, where('uid', '==', uid)));
-      const rows = snap.docs
-        .map((d) => d.data())
-        .sort((a, b) => (b.ts?.toMillis() ?? 0) - (a.ts?.toMillis() ?? 0))
-        .slice(0, 5);
-      setEntries(rows);
-    } catch (err) {
-      notify(friendlyError(err, 'Could not load balance history. Try again in a moment.'));
-    }
-  }
-
-  if (entries === null) {
-    return (
-      <button
-        type="button"
-        onClick={load}
-        className="cursor-pointer border-none bg-transparent p-0 text-[11px] text-text-muted underline decoration-border underline-offset-[3px] hover:text-text hover:decoration-accent"
-      >
-        History
-      </button>
-    );
-  }
-
-  return (
-    <div className="mt-1.5 w-full text-[11px] text-text-muted">
-      {entries.length === 0 ? (
-        <p className="m-0">No manual balance edits on record.</p>
-      ) : (
-        entries.map((e, i) => (
-          <p key={i} className="m-0">
-            B${e.from} → B${e.to}
-          </p>
-        ))
-      )}
-    </div>
-  );
-}
-
-export function MemberRow({ uid, profile, balance, holdsFinance, actions }: MemberRowProps) {
-  const isOwnerRow = profile.role === 'owner';
+export function MemberRow({ uid, profile, claimed, isMe, actions }: MemberRowProps) {
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+  const [confirmingRelease, setConfirmingRelease] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -139,45 +89,30 @@ export function MemberRow({ uid, profile, balance, holdsFinance, actions }: Memb
             {profile.name}
           </button>
         )}
-        {isOwnerRow && <Badge variant="owner">Owner</Badge>}
-        {!isOwnerRow && profile.role === 'admin' && <Badge variant="admin">Admin</Badge>}
-        {holdsFinance && <Badge variant="finance">Finance</Badge>}
+        {isHostName(profile.name) && <Badge variant="host">Host</Badge>}
+        {claimed && <Badge variant="muted">{isMe ? 'You' : 'In use'}</Badge>}
       </div>
       <div className="ml-auto flex flex-wrap items-center gap-1.5">
-        <input
-          // Remounts (discarding any unsaved edit) whenever the live balance changes
-          // underneath it — a stale defaultValue would otherwise get written back on
-          // blur and silently clobber a newer value from another admin's edit or a
-          // payout/bonus posting while this panel stayed open.
-          key={balance}
-          type="number"
-          title="Balance (B$)"
-          defaultValue={balance || 0}
-          onBlur={(e) => actions.updateBalance(uid, e.target.value, balance || 0)}
-          className="min-h-[38px] w-[76px] rounded-lg border border-border bg-bg-card px-2 py-2 font-mono text-[13px] text-text focus:border-accent focus:outline-none"
-        />
-        {!isOwnerRow && (
-          <Button variant="small" onClick={() => actions.setRole(uid, profile.role === 'admin' ? 'member' : 'admin')}>
-            {profile.role === 'admin' ? 'Remove admin' : 'Make admin'}
-          </Button>
+        {claimed && !isMe && (
+          <>
+            {/* For the "lost my phone / cleared my browser" case: the name is stuck on
+                a device nobody has any more, so its owner can't get back in. Freeing
+                it keeps the person and their history — only the device binding goes. */}
+            <Button variant="small" onClick={() => setConfirmingRelease(true)}>
+              Free up name
+            </Button>
+            <ConfirmDialog
+              open={confirmingRelease}
+              onOpenChange={setConfirmingRelease}
+              title={`Free up ${profile.name}?`}
+              description="Use this if they've lost their phone or cleared their browser and can't get back in. Whoever taps the name next takes it — make sure it's actually them."
+              confirmLabel="Free up name"
+              danger
+              onConfirm={() => actions.releaseClaimFor(uid)}
+            />
+          </>
         )}
-        <Button
-          variant="small"
-          onClick={() => (holdsFinance ? actions.clearFinanceHolder() : actions.assignFinanceHolder(uid))}
-        >
-          {holdsFinance ? 'Remove finance' : 'Make finance'}
-        </Button>
-        <Button
-          variant="small"
-          onClick={() =>
-            forgotPassword(profile.email)
-              .then(() => notify('Password reset email sent.', 'success'))
-              .catch((err) => notify(friendlyError(err, 'Could not send a reset email. Try again in a moment.')))
-          }
-        >
-          Reset password
-        </Button>
-        {!isOwnerRow && (
+        {!isMe && (
           <>
             <Button variant="danger" onClick={() => setConfirmingRemove(true)}>
               Remove
@@ -186,7 +121,7 @@ export function MemberRow({ uid, profile, balance, holdsFinance, actions }: Memb
               open={confirmingRemove}
               onOpenChange={setConfirmingRemove}
               title={`Remove ${profile.name}?`}
-              description="They'll lose access to the app immediately."
+              description="They come off the roster and lose access immediately. Any vote they already cast this week still counts — it can't be traced back to take out."
               confirmLabel="Remove"
               danger
               onConfirm={() => actions.removeTeammate(uid)}
@@ -194,7 +129,6 @@ export function MemberRow({ uid, profile, balance, holdsFinance, actions }: Memb
           </>
         )}
       </div>
-      <BalanceHistory uid={uid} />
     </div>
   );
 }

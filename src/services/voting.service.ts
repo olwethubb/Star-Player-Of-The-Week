@@ -1,39 +1,53 @@
-import { doc, getDocs, runTransaction, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
-import { db, myVoteRef, payoutsCol, settingsRef, tallyCol, balanceRef, weeklyActivityRef } from '@/lib/firebase';
-import { BONUS_AMOUNT } from '@/lib/constants';
+import { doc, getDocs, increment, runTransaction, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
+import { db, settingsRef, tallyCol, voterRef, votersCol, weeklyActivityRef } from '@/lib/firebase';
 import { computeWinners } from '@/lib/winners';
-import { getWeekKey, getWeekLabel } from '@/lib/week';
+import { getWeekKey } from '@/lib/week';
+import { clearLocalPick, setLocalPick } from '@/lib/localPick';
 import type { Profile } from '@/types/firestore';
-import { increment } from 'firebase/firestore';
 
-/** Casting a vote never reads anyone else's vote — old and new tally docs are nudged with
- * an atomic increment/decrement, so the only read in this transaction is your own vote record. */
-export async function castVote(myUid: string, forUid: string, votingOpen: boolean) {
-  if (!votingOpen || forUid === myUid) return;
-  const voteRef = myVoteRef(myUid);
-  await runTransaction(db, async (tx) => {
-    const mySnap = await tx.get(voteRef);
-    const prev = mySnap.exists() ? mySnap.data().votedForUid : null;
-    if (prev === forUid) return;
-    tx.set(doc(tallyCol, forUid), { count: increment(1) }, { merge: true });
-    if (prev) {
-      tx.set(doc(tallyCol, prev), { count: increment(-1) }, { merge: true });
-    }
-    tx.set(voteRef, { votedForUid: forUid, ts: serverTimestamp() });
-  });
+/** Casting a vote writes three things, and deliberately never writes a fourth:
+ *
+ *   sotw_tally/{candidate}  +1   (and -1 off the previous pick, if changing)
+ *   sotw_voters/{me}             a marker saying only THAT I voted
+ *   localStorage                 who I actually picked — this browser only
+ *
+ * The link between voter and candidate never reaches the server. That's why the
+ * previous pick has to be passed in from the caller rather than read back: there is
+ * nothing on the server to read it from, by design. See lib/localPick.ts.
+ *
+ * The tally nudges are atomic increments, so two people voting at once can't clobber
+ * each other's count. */
+export async function castVote(
+  myUid: string,
+  forUid: string,
+  previousPick: string | null,
+  weekKey: string | null,
+  votingOpen: boolean,
+) {
+  if (!votingOpen || forUid === myUid || previousPick === forUid) return;
+
+  const batch = writeBatch(db);
+  batch.set(doc(tallyCol, forUid), { count: increment(1) }, { merge: true });
+  if (previousPick) {
+    batch.set(doc(tallyCol, previousPick), { count: increment(-1) }, { merge: true });
+  }
+  batch.set(voterRef(myUid), { weekKey: getWeekKey(), ts: serverTimestamp() });
+  await batch.commit();
+
+  // Only after the write lands — a failed vote must not leave this browser
+  // believing it picked someone the tally never counted.
+  setLocalPick(weekKey, forUid);
 }
 
 /** Reveal happens in two steps: (1) atomically claim a "revealing" lock so only one
- * admin's click proceeds even if two click at once, then (2) read the now-unlocked
- * tally, work out the winner, and write it together with revealed:true in ONE batch
- * — so no client can ever observe revealed=true before the winner is actually known.
+ * click proceeds even if the host double-taps, then (2) read the now-settled tally,
+ * work out the winner, and write it together with revealed:true in ONE batch — so no
+ * client can ever observe revealed=true before the winner is actually known.
  *
- * A single winner is paid in that same batch, same as always. A tie is NOT paid here
- * — it's just announced (winnerUids has more than one entry) so everyone sees who
- * tied, and useAutoRunoff (SessionProvider) automatically reopens voting restricted
- * to just those names a few seconds later. Nobody is ever paid until exactly one
- * winner comes out of a round, whether that's this reveal or a later runoff's.
- * Returns false if nothing happened (already revealed/revealing). */
+ * A tie is announced rather than resolved here (winnerUids has more than one entry)
+ * so everyone sees who tied, and the automatic runoff reopens voting restricted to
+ * just those names a few seconds later. Returns false if nothing happened (already
+ * revealed, or a reveal is in flight). */
 export async function doReveal(profiles: Record<string, Profile>): Promise<boolean> {
   let claimedLock = false;
   try {
@@ -56,42 +70,21 @@ export async function doReveal(profiles: Record<string, Profile>): Promise<boole
 
     const { winnerUids, totalVotes } = computeWinners(tally);
 
-    // The reveal and the single-winner payout land in ONE batch: a failure here
-    // must never leave revealed:true committed with the winner unpaid — that
-    // state is invisible from the UI (WinnerBlock just says "+ B$300 awarded")
-    // and, once revealed:true lands, the lock above refuses to run doReveal
-    // again for this week, so there would be no way to retry.
     const batch = writeBatch(db);
-    batch.set(
-      settingsRef,
-      { revealed: true, revealing: false, winnerUids, totalVotes, runoffUids: null },
-      { merge: true },
-    );
+    batch.set(settingsRef, { revealed: true, revealing: false, winnerUids, totalVotes, runoffUids: null }, { merge: true });
     // The tally itself gets wiped (here or at the next rollover) — this is the only
-    // lasting record of who actually received a vote this week, which is what
-    // streak badges are computed from.
+    // lasting record of who received a vote this week, which is what streak badges
+    // are computed from. It records only that they received one, never from whom.
     const weekKey = getWeekKey();
     Object.entries(tally).forEach(([uid, count]) => {
       batch.set(weeklyActivityRef(weekKey, uid), { uid, weekKey, received: count > 0 });
     });
-    if (winnerUids.length === 1) {
-      const winnerUid = winnerUids[0]!;
-      const winnerName = profiles[winnerUid]?.name ?? '';
-      batch.set(balanceRef(winnerUid), { balance: increment(BONUS_AMOUNT) }, { merge: true });
-      batch.set(doc(payoutsCol), {
-        uid: winnerUid,
-        name: winnerName,
-        amount: BONUS_AMOUNT,
-        week: getWeekLabel(),
-        ts: serverTimestamp(),
-      });
-    }
     await batch.commit();
     return true;
   } catch (err) {
-    // If we'd already claimed the lock, an error past this point (a flaky tally read, a
-    // bonus batch that failed, etc.) must not leave revealing:true stuck — that would
-    // silently block every future reveal attempt for this week. Release the lock.
+    // If the lock was already claimed, an error past that point (a flaky tally read,
+    // a batch that failed) must not leave revealing:true stuck — that would silently
+    // block every future reveal for this week, with no way back from the UI.
     if (claimedLock) {
       await setDoc(settingsRef, { revealing: false }, { merge: true }).catch(() => {});
     }
@@ -99,14 +92,12 @@ export async function doReveal(profiles: Record<string, Profile>): Promise<boole
   }
 }
 
-/** Fires on its own a few seconds after a tie is announced (see useAutoRunoff in
- * SessionProvider) — nobody clicks anything. Reuses the `revealing` flag as a claim
- * lock, the same trick doReveal uses, so at most one admin's client's attempt
- * proceeds even if several have the app open. Clears the tied round's votes and
- * tally, then reopens voting with everyone (except admins) free to vote again, but
- * only for one of `tiedUids` — enforced in firestore.rules, not just here. Returns
- * false if another client already handled this tie (or it's no longer current). */
-export async function startRunoff(tiedUids: string[], profileUids: string[]): Promise<boolean> {
+/** Fires on its own a few seconds after a tie is announced — nobody clicks anything.
+ * Reuses the `revealing` flag as a claim lock, the same trick doReveal uses. Clears
+ * the tied round's voter markers and tally, then reopens voting with everyone (except
+ * the host) free to vote again, but only for one of `tiedUids` — enforced in
+ * firestore.rules, not just here. Returns false if the tie was already handled. */
+export async function startRunoff(tiedUids: string[]): Promise<boolean> {
   const claimed = await runTransaction(db, async (tx) => {
     const snap = await tx.get(settingsRef);
     const s = snap.data();
@@ -117,9 +108,9 @@ export async function startRunoff(tiedUids: string[], profileUids: string[]): Pr
   if (!claimed) return false;
 
   const batch = writeBatch(db);
-  profileUids.forEach((uid) => batch.delete(myVoteRef(uid)));
-  const tallySnap = await getDocs(tallyCol);
-  tallySnap.forEach((d) => batch.delete(d.ref));
+  const [voters, tallies] = await Promise.all([getDocs(votersCol), getDocs(tallyCol)]);
+  voters.forEach((d) => batch.delete(d.ref));
+  tallies.forEach((d) => batch.delete(d.ref));
   batch.set(
     settingsRef,
     { revealed: false, revealing: false, winnerUids: [], totalVotes: 0, runoffUids: tiedUids, votingOpen: true },
@@ -129,11 +120,10 @@ export async function startRunoff(tiedUids: string[], profileUids: string[]): Pr
   return true;
 }
 
-/** Escape hatch for a `revealing:true` lock that's stuck — e.g. the admin's tab
- * closed between the lock transaction committing and the rest of doReveal
- * running. The normal cleanup only fires from inside doReveal's own catch
- * block, so a lock stuck this way has no automatic recovery; this lets an
- * admin clear it from the UI instead of needing a direct Firestore edit. */
+/** Escape hatch for a `revealing:true` lock that's stuck — e.g. the host's tab closed
+ * between the lock transaction committing and the rest of doReveal running. The
+ * normal cleanup only fires from inside doReveal's own catch block, so a lock stuck
+ * this way has no automatic recovery. */
 export function forceUnlockReveal() {
   return setDoc(settingsRef, { revealing: false }, { merge: true });
 }
@@ -146,9 +136,9 @@ export function endVoting() {
   return setDoc(settingsRef, { votingOpen: false }, { merge: true });
 }
 
-/** Marks the current week as intentionally skipped (holiday, etc.) so the vote
- * screen shows "no vote this week" instead of the ambiguous "hasn't opened yet",
- * which reads as "the admin forgot". Cleared automatically on the next rollover. */
+/** Marks the current week as intentionally skipped (holiday, etc.) so the vote screen
+ * shows "no vote this week" instead of the ambiguous "hasn't opened yet", which reads
+ * as "the host forgot". Cleared automatically on the next rollover. */
 export function pauseWeek() {
   return setDoc(settingsRef, { weekPaused: true, votingOpen: false }, { merge: true });
 }
@@ -157,19 +147,19 @@ export function resumeWeek() {
   return setDoc(settingsRef, { weekPaused: false }, { merge: true });
 }
 
-/** Nobody clicks a button for this — the moment the voting week changes (Friday,
- * per getWeekKey's Thursday-to-Friday boundary), whichever admin/owner happens to
- * have the app open silently clears the previous week's votes and opens a fresh
- * one — voting starts back up automatically rather than waiting on an admin to
- * click "Start Voting", so it's reliably open first thing Friday. Also clears any
- * runoff still in progress — if a tie never finished resolving before the week
- * rolled over, the new week just starts clean with the full team, same as if
- * nobody had revealed at all. */
-export async function rollWeek(profiles: Record<string, Profile>, newWeekKey: string) {
+/** Nobody clicks a button for this — the moment the voting week changes (Friday, per
+ * getWeekKey's Thursday-to-Friday boundary), the HOST's client silently clears the
+ * previous week's markers and opens a fresh one. It has to be the host's: wiping
+ * sotw_voters and sotw_tally is host-only in firestore.rules, so the same call from
+ * anyone else's browser is denied. Voting still starts back up without the host
+ * pressing anything, so it's reliably open first thing Friday. Also clears any runoff
+ * still in progress — if a tie never finished resolving before the week rolled over,
+ * the new week just starts clean. */
+export async function rollWeek(newWeekKey: string) {
   const batch = writeBatch(db);
-  Object.keys(profiles).forEach((uid) => batch.delete(myVoteRef(uid)));
-  const tallySnap = await getDocs(tallyCol);
-  tallySnap.forEach((d) => batch.delete(d.ref));
+  const [voters, tallies] = await Promise.all([getDocs(votersCol), getDocs(tallyCol)]);
+  voters.forEach((d) => batch.delete(d.ref));
+  tallies.forEach((d) => batch.delete(d.ref));
   batch.set(
     settingsRef,
     {
@@ -185,4 +175,5 @@ export async function rollWeek(profiles: Record<string, Profile>, newWeekKey: st
     { merge: true },
   );
   await batch.commit();
+  clearLocalPick(newWeekKey);
 }

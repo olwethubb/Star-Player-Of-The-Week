@@ -117,7 +117,7 @@
       <div class="stack-cell">
         <p class="role">Backend</p>
         <p class="what">Firebase</p>
-        <p class="detail">No custom server. Firebase handles sign-in (email + password) and the database.</p>
+        <p class="detail">No custom server, and no Cloud Functions. Firebase signs each browser in anonymously — nobody ever sees a sign-in screen — and stores the data.</p>
       </div>
       <div class="stack-cell">
         <p class="role">Database</p>
@@ -152,17 +152,35 @@
     <div class="diagram">
       <div class="node"><p class="node-label">Browser</p><p class="node-name">React app</p><p class="node-sub">built by Vite</p></div>
       <div class="arrow"></div>
-      <div class="node"><p class="node-label">Sign-in</p><p class="node-name">Firebase Auth</p><p class="node-sub">email + password</p></div>
+      <div class="node"><p class="node-label">Who you are</p><p class="node-name">Anonymous sign-in</p><p class="node-sub">silent, nothing to type</p></div>
       <div class="arrow"></div>
       <div class="node"><p class="node-label">Data</p><p class="node-name">Firestore</p><p class="node-sub">updates live</p></div>
       <div class="arrow"></div>
       <div class="node"><p class="node-label">Checked by</p><p class="node-name">Security Rules</p><p class="node-sub">on the server, not the app</p></div>
     </div>
     <p style="font-size:13.5px;">
+      Nobody signs in. The first time a browser opens the app, Firebase quietly hands it an anonymous
+      ID — no email, no password, nothing to remember or lose. Tapping your name on the roster binds
+      that ID to that name, and that binding is the whole of "who you are" here. It exists for one
+      reason: without an identity the server itself can check, "this name is taken" would be a
+      suggestion on screen that anyone could click straight past.
+    </p>
+    <p style="font-size:13.5px;">
       There's no backend server deciding permissions — the app talks to the database directly, and a
-      separate file called <strong style="color:var(--ink)">Security Rules</strong> decides what any
-      signed-in person is actually allowed to do. That matters: nobody can get more access just by
-      changing what the app's own code does. Only changing the rules themselves changes what's allowed.
+      separate file called <strong style="color:var(--ink)">Security Rules</strong> decides what a given
+      browser is actually allowed to do. That matters: nobody can get more access just by changing what
+      the app's own code does. Only changing the rules themselves changes what's allowed.
+    </p>
+    <p style="font-size:13.5px;">
+      One name on the roster is different: whoever claims <strong style="color:var(--ink)">KG</strong>
+      runs the session — opens and closes voting, pauses a week, calls the reveal — and is the only one
+      who ever sees the totals. They don't vote themselves. There's no role to assign and no account to
+      promote; claiming that name is the whole of it. The database learns who it is from a single record
+      that KG's own browser writes, guarded so tightly that even the sitting host can't rewrite it to
+      hand the seat to a browser that never actually claimed KG — the only two ways in are genuinely
+      holding that claim yourself, or standing down and letting whoever holds it next take over. That
+      second path is what lets a replaced phone recover: someone re-claims the name KG, then registers
+      themselves as host in its place.
     </p>
   </section>
 
@@ -172,28 +190,34 @@
       <table>
         <thead><tr><th>Collection</th><th>What it holds</th><th>Who can read it</th></tr></thead>
         <tbody>
-          <tr><td class="coll">sotw_profiles</td><td>Name, email, and role for every teammate</td><td class="who">Everyone signed in</td></tr>
-          <tr><td class="coll">sotw_balances</td><td>Each person's Blacfox Dollar balance</td><td class="who">That person, admin, finance</td></tr>
-          <tr><td class="coll">sotw_myvote</td><td>Each person's own current vote</td><td class="who">Only that person</td></tr>
-          <tr><td class="coll">sotw_tally</td><td>Anonymous vote counts per person</td><td class="who">Admin, after reveal only</td></tr>
-          <tr><td class="coll">sotw_meta/settings</td><td>Is voting open, has it been revealed, who's finance, the winner</td><td class="who">Everyone signed in</td></tr>
-          <tr><td class="coll">sotw_payout_requests</td><td>Pending, approved, and rejected cash-out requests</td><td class="who">Requester, admin, finance</td></tr>
-          <tr><td class="coll">sotw_payouts</td><td>A permanent record of every bonus actually paid</td><td class="who">Admin, finance</td></tr>
-          <tr><td class="coll">sotw_balance_adjustments</td><td>A record of manual balance fixes — who changed what, and from what to what</td><td class="who">Admin, finance</td></tr>
+          <tr><td class="coll">sotw_profiles</td><td>The roster — each teammate's name, plus their photo if they've added one. Nothing else</td><td class="who">Everyone</td></tr>
+          <tr><td class="coll">sotw_claims</td><td>Which browser holds which name. Written once, when you tap your name, and never changed after</td><td class="who">Everyone</td></tr>
+          <tr><td class="coll">sotw_meta/settings</td><td>Is voting open, which week it is, is the week paused, has it been revealed, who won</td><td class="who">Everyone</td></tr>
+          <tr><td class="coll">sotw_meta/host</td><td>Which browser is running the session — written by whoever claims the name KG</td><td class="who">Everyone</td></tr>
+          <tr><td class="coll">sotw_voters</td><td>That a person has voted this week. There is no field here for who they voted for</td><td class="who">Everyone</td></tr>
+          <tr><td class="coll">sotw_tally</td><td>The running count of votes for each candidate — numbers only, no names attached to them</td><td class="who">KG, once voting closes</td></tr>
+          <tr><td class="coll">sotw_stat_status</td><td>Each person's own "stats up" or "stats down" for the current week</td><td class="who">Everyone</td></tr>
+          <tr><td class="coll">sotw_weekly_activity</td><td>That someone received at least one vote in a given week — what the streak badges are counted from</td><td class="who">Everyone</td></tr>
         </tbody>
       </table>
     </div>
     <p style="font-size:13px;margin-top:12px;">Every name starts with <code>sotw_</code> — a simple prefix so this data can share a database with something else later without clashing.</p>
+    <p style="font-size:13px;margin-top:10px;">There is no collection for "who I voted for", and that absence is the design. Your own pick is written to your browser's storage and nowhere else, so the link between a person and the name they chose never reaches the database at all. The cost is small and deliberate: clear your browser data and the app forgets which card to tick for you — the vote itself still stands, you just can't change it from a browser that no longer remembers it.</p>
   </section>
 
   <section>
     <h2 class="section-head"><span class="num">04</span> What's protected</h2>
     <div class="guarantee-list">
-      <div class="guarantee"><span class="check">✓</span><p><strong>Votes stay private.</strong> Nobody — not even an admin — can see who voted for whom. Only anonymous totals exist, and even those are hidden until the week is revealed.</p></div>
-      <div class="guarantee"><span class="check">✓</span><p><strong>Money can't be created out of nowhere.</strong> A finance holder can only lower a balance, never raise one — that's enforced by the database itself, not just the screen the app shows.</p></div>
-      <div class="guarantee"><span class="check">✓</span><p><strong>The weekly bonus is paid exactly once.</strong> Revealing the winner and paying them happen together, as one step — a dropped connection can't leave someone revealed but unpaid, or paid twice.</p></div>
-      <div class="guarantee"><span class="check">✓</span><p><strong>Every manual money change leaves a record.</strong> Fixing a balance by hand always writes down who changed it and what it was before.</p></div>
+      <div class="guarantee"><span class="check">✓</span><p><strong>One name, one person.</strong> Tapping a name binds it to that browser, and the database allows that record to be created but never overwritten. So the first browser to take a name owns it, and nobody else can vote as that person — not by clicking past a greyed-out button, not by editing the app's own code. Freeing a name that's stuck on a phone somebody no longer has is a deliberate act, and only KG can do it.</p></div>
+      <div class="guarantee"><span class="check">✓</span><p><strong>Nobody can learn who voted for whom.</strong> It is never recorded — not for teammates, not for KG, not for anyone reading the raw database. Two things get stored: that a person voted, and a running count for each candidate. KG is the only one who can read those counts, and only once voting has closed, so nobody can watch a number tick up and work out who just voted.</p></div>
     </div>
+    <p style="font-size:13px;margin-top:12px;">
+      The second guarantee carries one accepted trade-off. Because the server holds no record of your
+      pick, it can't check a vote being taken back against the vote you actually cast — it can only hold
+      each change to a single point up or down. Someone hand-crafting requests could nudge a rival's
+      count by one. Closing that would mean storing who voted for whom, which is precisely the thing this
+      design refuses to do, so the one-point limit is where the line sits.
+    </p>
   </section>
 
   <section>
@@ -214,9 +238,10 @@ firebase deploy <span class="flag">--only firestore:rules</span></div>
     <h2 class="section-head"><span class="num">06</span> What's happened so far</h2>
     <div class="log">
       <div class="log-entry"><p class="log-title">Rebuilt from one big file</p><p>The app used to be a single large HTML file. It's now a proper React + TypeScript codebase, easier to maintain and grow. The old version is being phased out.</p></div>
-      <div class="log-entry"><p class="log-title">Sign-in screen redesigned</p><p>Went through a few passes to land on a clean, centered design.</p></div>
-      <div class="log-entry"><p class="log-title">Security check-up</p><p>A full review found and fixed real gaps — including a way anyone signed in could inflate vote counts, and a way the finance role could raise balances instead of only lowering them.</p></div>
-      <div class="log-entry"><p class="log-title">Made the admin tools self-serve</p><p>Adding people, fixing a balance, and recovering from a stuck state can now all be done from the app — no direct database edit needed.</p></div>
+      <div class="log-entry"><p class="log-title">Security check-up</p><p>A full review found and fixed real gaps — including a way anyone could inflate vote counts.</p></div>
+      <div class="log-entry"><p class="log-title">Made the session controls self-serve</p><p>Adding, renaming and removing people, opening and closing voting, and recovering from a stuck state can now all be done from the app — no direct database edit needed.</p></div>
+      <div class="log-entry"><p class="log-title">Stats up or down, streaks, photos</p><p>Everyone says whether their stats are up before they vote, and only "up" goes on the poll. Photos, a badge for anyone who's received votes three weeks running, and a "pause this week" switch for holidays landed alongside it.</p></div>
+      <div class="log-entry"><p class="log-title">Stripped back to just the vote</p><p>Sign-in, accounts and the Blacfox Dollars wallet are gone, and every screen that wasn't the vote went with them. Open the app, tap your name, vote — that's the whole app now, and the rules got shorter and stricter for it.</p></div>
     </div>
   </section>
 

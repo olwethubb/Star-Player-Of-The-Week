@@ -3,9 +3,8 @@ import { AppValidationError, friendlyError } from './errors';
 
 describe('friendlyError', () => {
   it('surfaces the message of the app\'s own validation errors', () => {
-    expect(friendlyError(new AppValidationError('You only have B$50 available.'), 'fallback')).toBe(
-      'You only have B$50 available.',
-    );
+    const taken = 'Someone else is already using that name. Pick another, or ask KG to free it up.';
+    expect(friendlyError(new AppValidationError(taken), 'fallback')).toBe(taken);
   });
 
   it('never surfaces a raw Firebase-style error, even one with a message', () => {

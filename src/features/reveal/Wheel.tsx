@@ -23,7 +23,7 @@ const DENSE_ROSTER_THRESHOLD = 14;
 
 /** The reveal wheel's rotation is set imperatively via refs, deliberately outside React
  * state. The wedges/labels are memoized from props that never change mid-spin, so no
- * unrelated re-render (a payout/balance snapshot landing mid-ceremony) ever touches this
+ * unrelated re-render (an unrelated snapshot landing mid-ceremony) ever touches this
  * subtree or resets the in-flight CSS transition. Making the rotation reactive would risk
  * exactly that regression — the bug this component exists to avoid (see commit e51256c).
  *

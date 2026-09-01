@@ -1,38 +1,21 @@
 import { Suspense } from 'react';
 import { TopBar } from '@/components/layout/TopBar';
-import { CashoutCard } from '@/features/wallet/CashoutCard';
 import { MyAccountPanel } from '@/features/account/MyAccountPanel';
-import { LazyPastWinnersPanel, LazyPayoutQueuePanel } from '@/features/payouts/PayoutQueuePanel.lazy';
 import { LazyManageTeamPanel } from '@/features/team-admin/ManageTeamPanel.lazy';
 import { useCastVote } from '@/hooks/useVotingActions';
-import { BONUS_AMOUNT } from '@/lib/constants';
 import { VoteGrid } from './VoteGrid';
 import { StatStatusGate } from './StatStatusGate';
 import { SessionControls } from './SessionControls';
+import { VotingProgress } from './VotingProgress';
 import { useSession } from '@/hooks/useSession';
 
 export function MainScreen() {
-  const {
-    user,
-    me,
-    profiles,
-    settings,
-    myVote,
-    myBalance,
-    balances,
-    statStatuses,
-    payoutQueue,
-    payoutHistory,
-    myPayout,
-    isAdmin,
-    canManagePayouts,
-  } = useSession();
+  const { myUid, me, profiles, claims, settings, voters, statStatuses, myPick, isHost } = useSession();
 
   const votingOpen = !!settings.votingOpen;
-  const financeName = settings.financeUid ? profiles[settings.financeUid]?.name ?? null : null;
-  const { castVote, pendingUid } = useCastVote(user?.uid ?? '', votingOpen);
+  const { castVote, pendingUid } = useCastVote();
 
-  if (!user || !me) return null;
+  if (!myUid || !me) return null;
 
   const runoffUids = settings.runoffUids;
   const isUpThisWeek = (uid: string) => {
@@ -40,32 +23,36 @@ export function MainScreen() {
     return !!decl && decl.weekKey === settings.currentWeek && decl.status === 'up';
   };
   const others = Object.entries(profiles).filter(
-    ([uid]) => uid !== user.uid && isUpThisWeek(uid) && (!runoffUids || runoffUids.includes(uid)),
+    ([uid]) => uid !== myUid && isUpThisWeek(uid) && (!runoffUids || runoffUids.includes(uid)),
   );
-  const myDeclaredStatus = statStatuses[user.uid]?.weekKey === settings.currentWeek ? statStatuses[user.uid]!.status : null;
-  // Voting is open and nobody's declared their status yet this week — the grid
+  const myDeclaredStatus = statStatuses[myUid]?.weekKey === settings.currentWeek ? statStatuses[myUid]!.status : null;
+  // Voting is open and they haven't declared their status yet this week — the grid
   // stays hidden until they do, StatStatusGate above is all there is to see.
   const awaitingMyStatus = votingOpen && !settings.weekPaused && !myDeclaredStatus;
 
   return (
     <>
-      <TopBar me={me} balance={myBalance} />
+      <TopBar me={me} />
       <h1 className="m-0 mb-2 font-serif text-[clamp(24px,6vw,34px)] font-bold italic leading-[1.15]">
         Star Player of the Week
       </h1>
       <p className="mb-7 max-w-[520px] text-sm leading-relaxed text-text-muted">
-        Vote for the teammate who went above and beyond this week. The winner receives B${BONUS_AMOUNT}. Results
-        stay hidden until an admin reveals them.
+        Vote for the teammate who went above and beyond this week. Nobody sees who you picked — not even KG, who
+        only ever sees the totals.
       </p>
 
-      <CashoutCard uid={user.uid} profile={me} balance={myBalance} myPayout={myPayout} financeName={financeName} />
+      {votingOpen && !settings.weekPaused && !isHost && <StatStatusGate uid={myUid} current={myDeclaredStatus} />}
 
-      {votingOpen && !settings.weekPaused && <StatStatusGate uid={user.uid} current={myDeclaredStatus} />}
-
-      {isAdmin ? (
-        <p className="mb-6 rounded-xl border border-border-soft bg-bg-elevated px-4 py-3 text-[13px] text-text-muted">
-          Admins don't cast a vote — you're running this week's session instead.
-        </p>
+      {isHost ? (
+        <>
+          <p className="mb-5 rounded-xl border border-border-soft bg-bg-elevated px-4 py-3 text-[13px] text-text-muted">
+            You're running this week's session, so you don't cast a vote. Once you close voting you'll see the
+            totals — who's leading, and whether it's a tie — but never who voted for whom.
+          </p>
+          {votingOpen && (
+            <VotingProgress voters={voters} weekKey={settings.currentWeek} eligibleCount={Object.keys(claims).length - 1} />
+          )}
+        </>
       ) : awaitingMyStatus ? null : (
         <>
           {runoffUids && (
@@ -77,34 +64,18 @@ export function MainScreen() {
             votingOpen={votingOpen}
             weekPaused={!!settings.weekPaused}
             others={others}
-            myVote={myVote}
+            myPick={myPick}
             pendingUid={pendingUid}
             onVote={castVote}
           />
         </>
       )}
 
-      {isAdmin && (
-        <SessionControls
-          votingOpen={votingOpen}
-          weekPaused={!!settings.weekPaused}
-          revealing={!!settings.revealing}
-          profiles={profiles}
-        />
+      {isHost && (
+        <SessionControls votingOpen={votingOpen} weekPaused={!!settings.weekPaused} revealing={!!settings.revealing} />
       )}
       <MyAccountPanel />
-      <Suspense fallback={null}>
-        {canManagePayouts && <LazyPayoutQueuePanel queue={payoutQueue} resolvedBy={user.uid} />}
-        {canManagePayouts && <LazyPastWinnersPanel history={payoutHistory} />}
-        {isAdmin && (
-          <LazyManageTeamPanel
-            profiles={profiles}
-            balances={balances}
-            financeUid={settings.financeUid}
-            actingUid={user.uid}
-          />
-        )}
-      </Suspense>
+      <Suspense fallback={null}>{isHost && <LazyManageTeamPanel />}</Suspense>
     </>
   );
 }

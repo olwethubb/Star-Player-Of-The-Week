@@ -1,6 +1,5 @@
-import { IconTrophy, IconWallet } from '@/components/ui/Icons';
+import { IconTrophy } from '@/components/ui/Icons';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { BONUS_AMOUNT } from '@/lib/constants';
 import type { Profile, Settings } from '@/types/firestore';
 
 function TrophyHeader() {
@@ -14,19 +13,11 @@ function TrophyHeader() {
   );
 }
 
-export function WinnerBlock({
-  settings,
-  profiles,
-}: {
-  settings: Settings;
-  profiles: Record<string, Profile>;
-}) {
+export function WinnerBlock({ settings, profiles }: { settings: Settings; profiles: Record<string, Profile> }) {
   const { totalVotes, winnerUids } = settings;
 
   if (totalVotes === 0) {
-    return (
-      <EmptyState icon={<IconTrophy width={18} height={18} />}>No votes were cast this week.</EmptyState>
-    );
+    return <EmptyState icon={<IconTrophy width={18} height={18} />}>No votes were cast this week.</EmptyState>;
   }
 
   if (winnerUids.length === 1) {
@@ -38,9 +29,6 @@ export function WinnerBlock({
           {winner?.name ?? 'Unknown'}
         </p>
         <p className="m-0 font-mono text-xs uppercase tracking-[0.05em] text-text-muted">Star Player of the Week</p>
-        <p className="mt-3.5 inline-flex items-center gap-1.5 font-mono text-sm font-bold text-accent">
-          <IconWallet /> + B${BONUS_AMOUNT} awarded
-        </p>
       </div>
     );
   }

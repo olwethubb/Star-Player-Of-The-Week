@@ -1,38 +1,36 @@
 /** Captures the app's real screens as phone-sized images for the team handbook.
  *
- * Needs the emulators running and a dev server pointed at them:
+ * Needs the emulator running and a dev server pointed at it:
  *   firebase emulators:start --only auth,firestore
- *   VITE_USE_EMULATORS=1 npx vite --port 5199
+ *   VITE_USE_EMULATORS=1 npx vite --port 5210
  *   node scripts/capture-doc-shots.mjs
  *
  * Seeds its own demo team, so it fully controls the state each shot is taken in.
+ * The auth emulator is still needed even though nobody signs in — the app does a
+ * silent anonymous sign-in on load to get the device identity that name claims hang
+ * off, and without it every screen stops at the loading state.
  */
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
-import { DEMO_SETTINGS, resetEmulators, setDoc, signUp } from './seed-lib.mjs';
+import { DEMO_SETTINGS, DEMO_WEEK, fakeUid, resetEmulators, setDoc } from './seed-lib.mjs';
 
 const URL = 'http://localhost:5210';
 const OUT = 'docs/screenshots';
-const PASSWORD = 'Demo-Pass-2026!';
-const ME = { name: 'Benita', email: 'benita@blacfox.com', balance: 300 };
-const TEAM = [
-  { name: 'Amilio', email: 'amilio@blacfox.com', balance: 450 },
-  { name: 'Pinto', email: 'pinto@blacfox.com', balance: 300 },
-  { name: 'Laroche', email: 'laroche@blacfox.com', balance: 0 },
-  { name: 'Nomonde', email: 'nomonde@blacfox.com', balance: 150 },
-  { name: 'Indi', email: 'indi@blacfox.com', balance: 600 },
-  { name: 'Jaydon', email: 'jaydon@blacfox.com', balance: 0 },
-];
+const HOST = 'KG';
+const ME = 'Benita';
+const TEAM = ['Amilio', 'Pinto', 'Laroche', 'Nomonde', 'Indi', 'Jaydon'];
 
 mkdirSync(OUT, { recursive: true });
 
 await resetEmulators();
 const uids = {};
-for (const m of [ME, ...TEAM]) {
-  const uid = await signUp(m.email, PASSWORD);
-  uids[m.email] = uid;
-  await setDoc(`sotw_profiles/${uid}`, { name: m.name, email: m.email, role: 'member' });
-  await setDoc(`sotw_balances/${uid}`, { balance: m.balance });
+for (const name of [HOST, ME, ...TEAM]) {
+  const uid = fakeUid(name);
+  uids[name] = uid;
+  await setDoc(`sotw_profiles/${uid}`, { name });
+  if (name !== HOST) {
+    await setDoc(`sotw_stat_status/${uid}`, { weekKey: DEMO_WEEK, status: 'up' });
+  }
 }
 await setDoc('sotw_meta/settings', DEMO_SETTINGS);
 console.log('seeded demo team');
@@ -54,17 +52,14 @@ async function shot(name, locator) {
   console.log('captured', name);
 }
 
-// 1. The sign-in screen — the first thing anyone sees.
+// 1. The name picker — the first and only thing standing between you and voting.
 await page.goto(URL, { waitUntil: 'networkidle' });
-await page.waitForTimeout(800);
-await page.getByRole('button', { name: 'Vote Now' }).click();
-await page.waitForTimeout(700);
-await shot('01-signin');
+await page.getByText('Who are you?').waitFor({ timeout: 25000 });
+await page.waitForTimeout(600);
+await shot('01-pick-name');
 
 // 2. The vote list, open and untouched.
-await page.getByLabel('Email').fill(ME.email);
-await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
-await page.getByRole('button', { name: 'Log in' }).click();
+await page.getByRole('button', { name: ME }).click();
 await page.getByRole('button', { name: 'Vote', exact: true }).first().waitFor({ timeout: 20000 });
 await page.waitForTimeout(1200);
 const grid = page.locator('div.grid').first();
@@ -76,24 +71,20 @@ await page.getByRole('button', { name: 'Voted' }).first().waitFor({ timeout: 150
 await page.waitForTimeout(700);
 await shot('03-voted', grid.locator('> div').first());
 
-// 4. The cash-out card with an amount entered.
-await page.getByLabel('Amount to cash out').fill('300');
-await page.waitForTimeout(400);
-await shot('04-cashout', page.locator('div.rounded-2xl.shadow-card').first());
-
-// 5. The result once an admin reveals it.
+// 4. The result once the host reveals it.
 await setDoc('sotw_meta/settings', {
   ...DEMO_SETTINGS,
+  votingOpen: false,
   revealed: true,
   totalVotes: 6,
-  winnerUids: [uids['amilio@blacfox.com']],
+  winnerUids: [uids['Amilio']],
 });
 await page.reload({ waitUntil: 'load' });
 await page.getByText('Results', { exact: true }).waitFor({ timeout: 25000 });
 await page.waitForTimeout(1200);
 // Crop to the winner card rather than the whole viewport — the results screen is
 // mostly empty below it, and that dead space reads as a broken image in the doc.
-await shot('05-results', page.locator('div.animate-reveal-in').first());
+await shot('04-results', page.locator('div.animate-reveal-in').first());
 
 await browser.close();
 console.log('done');

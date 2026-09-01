@@ -24,16 +24,6 @@ export function IconCheck(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-export function IconWallet(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg width={14} height={14} viewBox="0 0 24 24" strokeWidth={2} {...base} {...props}>
-      <rect x="3" y="6" width="18" height="13" rx="2" />
-      <path d="M3 10h18" />
-      <circle cx="16" cy="14.5" r="1.1" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
 export function IconTrophy(props: SVGProps<SVGSVGElement>) {
   return (
     <svg width={40} height={40} viewBox="0 0 24 24" strokeWidth={1.5} {...base} {...props}>

@@ -1,4 +1,4 @@
-/** Thrown deliberately at app-level validation sites (insufficient balance, self-vote, ...).
+/** Thrown deliberately at app-level validation sites (name already claimed, self-vote, ...).
  * Its message is safe to show to the user, unlike a raw Firebase error. */
 export class AppValidationError extends Error {
   readonly isAppError = true;

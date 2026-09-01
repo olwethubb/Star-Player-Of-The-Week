@@ -1,76 +1,42 @@
-import { createUserWithEmailAndPassword, deleteUser, signOut } from 'firebase/auth';
-import { deleteDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { withSecondaryAuth } from '@/lib/firebase-secondary';
-import { balanceRef, myVoteRef, profileRef, settingsRef } from '@/lib/firebase';
-import { isValidPin, pinToPassword } from '@/lib/auth-pin';
+import { addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { claimRef, profileRef, profilesCol, statStatusRef, voterRef } from '@/lib/firebase';
 import { AppValidationError } from '@/lib/errors';
-import type { Role } from '@/types/firestore';
 
-/** Creates a teammate's Auth user via a throwaway secondary app, so the admin doing
- * this stays signed in — then writes their profile + a zero balance. If either write
- * fails, the just-created Auth user is deleted before the error propagates: without
- * this, that email would be permanently claimed and unrecoverable through the UI —
- * the admin's only retry would then fail with "already in use" forever. Every
- * account created here is PIN-based — see pinToPassword for why that's what's
- * actually stored as the Auth password. */
-export async function createTeamMember(name: string, email: string, pin: string, role: Role) {
-  if (!isValidPin(pin)) {
-    throw new AppValidationError('PIN must be exactly 4 digits.');
+/** Adding someone is just a name now — no account, no email, no PIN, nothing to
+ * hand over. They open the app, tap their name, and they're in. Firestore mints the
+ * document id, which becomes their uid everywhere else. */
+export function addTeammate(name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new AppValidationError('Enter a name first.');
   }
-  await withSecondaryAuth(async (secondaryAuth) => {
-    const cred = await createUserWithEmailAndPassword(secondaryAuth, email, pinToPassword(pin));
-    try {
-      await Promise.all([
-        setDoc(profileRef(cred.user.uid), { name, email, role }),
-        setDoc(balanceRef(cred.user.uid), { balance: 0 }),
-      ]);
-    } catch (err) {
-      await deleteUser(cred.user).catch(() => {});
-      throw err;
-    } finally {
-      await signOut(secondaryAuth).catch(() => {});
-    }
-  });
+  return addDoc(profilesCol, { name: trimmed });
 }
 
-/** Fixes a mistyped name without deleting and re-adding the person — a delete
- * would orphan their balance/vote/payout history for no reason. Deliberately
- * name-only: their Firestore `email` field is just a display value, but their
- * actual Auth login email lives on the Auth account itself and can't be changed
- * from here, so editing it here would silently stop matching what they sign in
- * with. */
+/** Fixes a mistyped name without deleting and re-adding the person — a delete would
+ * orphan their streak history for no reason. */
 export function renameTeammate(uid: string, name: string) {
   return updateDoc(profileRef(uid), { name });
 }
 
-/** Same call whether it's someone setting their own avatar or an admin setting a
- * teammate's — firestore.rules is what actually distinguishes those (self, or
- * isAdmin()), not this function. */
+/** Same call whether it's someone setting their own photo or the host setting a
+ * teammate's — firestore.rules is what distinguishes those (holdsClaim, or isHost),
+ * not this function. */
 export function setAvatar(uid: string, dataUri: string) {
   return updateDoc(profileRef(uid), { avatarUrl: dataUri });
 }
 
 /** Note: if they'd already voted this week, that vote's count stays in the anonymous
- * tally — it can't be reversed without knowing who they picked, which nobody may see. */
+ * tally — it can't be reversed, because reversing it would mean knowing who they
+ * picked, and nothing anywhere records that. */
 export async function removeTeammate(uid: string) {
   await deleteDoc(profileRef(uid));
-  await Promise.allSettled([deleteDoc(myVoteRef(uid)), deleteDoc(balanceRef(uid))]);
+  await Promise.allSettled([deleteDoc(claimRef(uid)), deleteDoc(voterRef(uid)), deleteDoc(statStatusRef(uid))]);
 }
 
-export function setRole(uid: string, newRole: Role) {
-  return updateDoc(profileRef(uid), { role: newRole });
-}
-
-// Two explicit actions rather than one "toggle" — a toggle has to trust a
-// currentFinanceUid value handed to it from a possibly-stale render, and
-// getting that stale read wrong flips the intent (a click meant to REMOVE
-// finance from someone can silently ASSIGN it to them instead, if another
-// admin's change hadn't reached this client yet). Each of these does exactly
-// one unambiguous thing regardless of what this client currently believes.
-export function assignFinanceHolder(uid: string) {
-  return setDoc(settingsRef, { financeUid: uid }, { merge: true });
-}
-
-export function clearFinanceHolder() {
-  return setDoc(settingsRef, { financeUid: null }, { merge: true });
+/** Frees a name that's stuck on a browser nobody has any more (lost phone, cleared
+ * site data). The person keeps their profile, streaks and history — only the binding
+ * to a device is dropped, so they can claim themselves again on the new one. */
+export function releaseClaimFor(uid: string) {
+  return deleteDoc(claimRef(uid));
 }

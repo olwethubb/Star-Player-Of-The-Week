@@ -1,59 +1,40 @@
-import { useState } from 'react';
 import { useSession } from '@/hooks/useSession';
 import { useRevealCeremony } from '@/hooks/useRevealCeremony';
 import { AppShell } from '@/components/layout/AppShell';
 import { Spinner } from '@/components/ui/Spinner';
-import { Gate } from '@/features/gate/Gate';
-import { LoginForm } from '@/features/gate/LoginForm';
-import { SignupForm } from '@/features/gate/SignupForm';
-import { VerifyEmailScreen } from '@/features/gate/VerifyEmailScreen';
-import { NoAccessScreen } from '@/features/gate/NoAccessScreen';
+import { NamePicker } from '@/features/picker/NamePicker';
 import { MainScreen } from '@/features/voting/MainScreen';
 import { ResultsPage } from '@/features/reveal/ResultsPage';
 import { RevealCeremony } from '@/features/reveal/RevealCeremony';
 
-type GateMode = 'gate' | 'login' | 'signup';
-
 export function App() {
   const session = useSession();
-  const [gateMode, setGateMode] = useState<GateMode>('gate');
   const ceremony = useRevealCeremony(session.settings.revealed, session.loadedSettings, session.authEpoch);
 
+  // Anonymous sign-in is still resolving. We genuinely don't know yet whether this
+  // browser already holds a name, so show neutral loading rather than the picker —
+  // someone who chose weeks ago would otherwise flash it on every load.
   if (session.authResolving) {
     return (
       <AppShell>
-        <Spinner label="Checking your session" />
+        <Spinner label="Getting things ready" errorMsg={session.loadErrorMsg} />
       </AppShell>
     );
   }
 
-  // Gate screens render OUTSIDE AppShell: they're a full-bleed two-panel layout, and
-  // AppShell's max-w-[820px] column (right for the logged-in app) would cage them.
-  if (!session.user) {
-    if (gateMode === 'login') {
-      return <LoginForm onSignup={() => setGateMode('signup')} onBack={() => setGateMode('gate')} />;
-    }
-    if (gateMode === 'signup') {
-      return <SignupForm onLogin={() => setGateMode('login')} onBack={() => setGateMode('gate')} />;
-    }
-    return <Gate onVote={() => setGateMode('login')} onSignup={() => setGateMode('signup')} />;
+  // The picker renders OUTSIDE AppShell: it's a full-bleed centred layout, and
+  // AppShell's max-w-[820px] column would cage it.
+  if (!session.myUid) {
+    return <NamePicker />;
   }
 
-  const loaded = session.loadedProfiles && session.loadedSettings && session.loadedMyVote && session.loadedMyBalance;
-  if (!loaded) {
+  const loaded = session.loadedProfiles && session.loadedClaims && session.loadedSettings && session.loadedVoters;
+  if (!loaded || !session.me) {
     return (
       <AppShell>
-        <Spinner label="Loading your data" errorMsg={session.loadErrorMsg} />
+        <Spinner label="Loading the vote" errorMsg={session.loadErrorMsg} />
       </AppShell>
     );
-  }
-
-  if (!session.me) {
-    return <NoAccessScreen />;
-  }
-
-  if (session.me.selfSignup && !session.user.emailVerified) {
-    return <VerifyEmailScreen user={session.user} onRefresh={session.refreshUser} />;
   }
 
   if (ceremony.pending && ceremony.phase) {
@@ -61,19 +42,10 @@ export function App() {
       <AppShell>
         <RevealCeremony
           phase={ceremony.phase}
-          count={ceremony.count}
           spinMs={ceremony.spinMs}
           settings={session.settings}
           profiles={session.profiles}
         />
-      </AppShell>
-    );
-  }
-
-  if (session.settings.revealed && session.isAdmin && !session.loadedTally) {
-    return (
-      <AppShell>
-        <Spinner label="Loading results" />
       </AppShell>
     );
   }

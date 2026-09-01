@@ -4,7 +4,6 @@ import { playChime } from '@/lib/chime';
 import { useTtsPreference } from '@/hooks/useTtsPreference';
 import type { Profile, Settings } from '@/types/firestore';
 import type { CeremonyPhase } from '@/hooks/useRevealCeremony';
-import { Countdown } from './Countdown';
 import { DrumrollShell } from './DrumrollShell';
 import { Wheel } from './Wheel';
 import { WinnerPopup } from './WinnerPopup';
@@ -22,13 +21,11 @@ function winnerAnnouncement(totalVotes: number, winnerUids: string[], profiles: 
 
 export function RevealCeremony({
   phase,
-  count,
   spinMs,
   settings,
   profiles,
 }: {
   phase: CeremonyPhase;
-  count: number;
   spinMs: number;
   settings: Settings;
   profiles: Record<string, Profile>;
@@ -41,8 +38,6 @@ export function RevealCeremony({
     speak(winnerAnnouncement(settings.totalVotes, settings.winnerUids, profiles));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, ttsEnabled]);
-
-  if (phase === 'countdown') return <Countdown count={count} />;
 
   return (
     <DrumrollShell>
