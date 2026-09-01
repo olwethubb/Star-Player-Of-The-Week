@@ -63,7 +63,16 @@ export async function doReveal(profiles: Record<string, Profile>): Promise<boole
 
     const tallySnap = await getDocs(tallyCol);
     const tally: Record<string, number> = {};
-    tallySnap.forEach((d) => (tally[d.id] = d.data().count || 0));
+    tallySnap.forEach((d) => {
+      // A tally doc for someone no longer on the roster — removed between picking up
+      // votes and this reveal — must not be eligible to win. Without this guard,
+      // that leftover count could still be the highest one here, and computeWinners
+      // would hand back a uid with no matching profile: "Unknown" on the results
+      // page, and in the reveal ceremony's own wheel popup, since both read the same
+      // winnerUids this writes. The vote itself isn't un-cast (that would need
+      // knowing who cast it, which nothing here ever learns) — it just can't win.
+      if (d.id in profiles) tally[d.id] = d.data().count || 0;
+    });
     Object.keys(profiles).forEach((uid) => {
       if (!(uid in tally)) tally[uid] = 0;
     });

@@ -1,6 +1,5 @@
 import { Suspense } from 'react';
 import { TopBar } from '@/components/layout/TopBar';
-import { MyAccountPanel } from '@/features/account/MyAccountPanel';
 import { LazyManageTeamPanel } from '@/features/team-admin/ManageTeamPanel.lazy';
 import { useSession } from '@/hooks/useSession';
 import { WinnerBlock } from './WinnerBlock';
@@ -17,7 +16,7 @@ export function ResultsPage() {
     <>
       <TopBar me={me} />
       <p className="mb-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-text-muted">Results</p>
-      <h1 className="m-0 mb-5 font-serif text-[clamp(24px,6vw,34px)] font-bold italic leading-[1.15]">
+      <h1 className="m-0 mb-5 font-serif text-[clamp(22px,5vw,30px)] font-bold italic leading-[1.15]">
         {total} vote{total === 1 ? '' : 's'} cast this week
       </h1>
 
@@ -31,7 +30,6 @@ export function ResultsPage() {
       {isHost && (
         <p className="mb-5 text-xs text-text-muted">Voting reopens automatically on Friday, when the new week starts.</p>
       )}
-      <MyAccountPanel />
       <Suspense fallback={null}>{isHost && <LazyManageTeamPanel />}</Suspense>
     </>
   );

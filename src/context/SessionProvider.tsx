@@ -157,6 +157,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // firestore.rules also refuses the read while voting is open (nobody can watch the
   // live count move and infer who just voted), so this stays in step with what the
   // database would actually hand back either way.
+  //
+  // The retry below exists because of a real race, not a hypothetical one: this
+  // effect fires the instant `settings.votingOpen` flips to false in React state,
+  // but that state comes from the settingsRef LISTENER, which echoes a local write
+  // (End Voting) the moment it's applied to the local cache — a beat before the
+  // server has actually committed it. The rules evaluate against server state, so
+  // the very first subscribe attempt here can land while the server still thinks
+  // voting is open and get denied — and unlike a transient network blip, Firestore's
+  // SDK does not retry a permission-denied listener on its own; it just stops. A
+  // short bounded retry rides out that exact gap instead of leaving the host's
+  // tally — and the whole results page's Scoreboard — stuck empty forever.
   useEffect(() => {
     if (!loadedSettings || !loadedClaims) return;
     if (!isHost || settings.votingOpen) {
@@ -165,17 +176,38 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return;
     }
     setLoadedTally(false);
-    const unsub = onSnapshot(
-      tallyCol,
-      (snap) => {
-        const t: Record<string, number> = {};
-        snap.forEach((d) => (t[d.id] = d.data().count || 0));
-        setTally(t);
-        setLoadedTally(true);
-      },
-      onErr,
-    );
-    return unsub;
+
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let unsub: (() => void) | null = null;
+
+    const subscribe = (attempt: number) => {
+      unsub = onSnapshot(
+        tallyCol,
+        (snap) => {
+          const t: Record<string, number> = {};
+          snap.forEach((d) => (t[d.id] = d.data().count || 0));
+          setTally(t);
+          setLoadedTally(true);
+        },
+        (err) => {
+          const isPermissionRace =
+            attempt < 5 && err && typeof err === 'object' && 'code' in err && err.code === 'permission-denied';
+          if (!cancelled && isPermissionRace) {
+            retryTimer = setTimeout(() => subscribe(attempt + 1), 400);
+            return;
+          }
+          onErr(err);
+        },
+      );
+    };
+    subscribe(0);
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      if (unsub) unsub();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedSettings, loadedClaims, isHost, settings.votingOpen]);
 

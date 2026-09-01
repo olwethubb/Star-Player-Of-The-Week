@@ -1,6 +1,5 @@
 import { Suspense } from 'react';
 import { TopBar } from '@/components/layout/TopBar';
-import { MyAccountPanel } from '@/features/account/MyAccountPanel';
 import { LazyManageTeamPanel } from '@/features/team-admin/ManageTeamPanel.lazy';
 import { useCastVote } from '@/hooks/useVotingActions';
 import { VoteGrid } from './VoteGrid';
@@ -74,7 +73,6 @@ export function MainScreen() {
       {isHost && (
         <SessionControls votingOpen={votingOpen} weekPaused={!!settings.weekPaused} revealing={!!settings.revealing} />
       )}
-      <MyAccountPanel />
       <Suspense fallback={null}>{isHost && <LazyManageTeamPanel />}</Suspense>
     </>
   );

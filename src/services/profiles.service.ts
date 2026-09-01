@@ -19,13 +19,6 @@ export function renameTeammate(uid: string, name: string) {
   return updateDoc(profileRef(uid), { name });
 }
 
-/** Same call whether it's someone setting their own photo or the host setting a
- * teammate's — firestore.rules is what distinguishes those (holdsClaim, or isHost),
- * not this function. */
-export function setAvatar(uid: string, dataUri: string) {
-  return updateDoc(profileRef(uid), { avatarUrl: dataUri });
-}
-
 /** Note: if they'd already voted this week, that vote's count stays in the anonymous
  * tally — it can't be reversed, because reversing it would mean knowing who they
  * picked, and nothing anywhere records that. */

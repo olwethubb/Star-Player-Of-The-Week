@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
 
 // The regression guard for firestore.rules. This app has no sign-in of any kind —
 // not a login screen, not even an invisible one — no roles and no money. It does
@@ -367,5 +367,36 @@ describe('sotw_weekly_activity — what is left after the tally is wiped', () =>
       await setDoc(doc(context.firestore(), 'sotw_weekly_activity', `${WEEK}_ob`), { uid: 'ob', weekKey: WEEK, received: true });
     });
     await assertSucceeds(getDoc(doc(client(), 'sotw_weekly_activity', `${WEEK}_ob`)));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 8. LIST QUERIES — every test above reads with getDoc (single document). The
+// app itself never does that for sotw_tally: doReveal and the host's live
+// subscription both run a `list` query (getDocs/onSnapshot) over the whole
+// collection. Firestore evaluates `list` and `get` separately, so a rule that
+// passes every getDoc-based test above can still behave differently — or
+// outright error — under `list`. This section exists specifically to close
+// that gap after it let a real bug through uncaught.
+// ---------------------------------------------------------------------------
+
+describe('sotw_tally — the actual list query the app runs, not just getDoc', () => {
+  it('lists successfully once voting is closed, including with zero matching docs', async () => {
+    await seedSettingsThisWeek({ votingOpen: false });
+    await assertSucceeds(getDocs(collection(client(), 'sotw_tally')));
+  });
+
+  it('lists successfully with one matching doc', async () => {
+    await seedSettingsThisWeek({ votingOpen: false });
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'sotw_tally', 'ob'), { count: 3 });
+    });
+    const snap = await assertSucceeds(getDocs(collection(client(), 'sotw_tally')));
+    if (snap.size !== 1) throw new Error(`expected 1 doc, got ${snap.size}`);
+  });
+
+  it('rejects listing while voting is open', async () => {
+    await seedSettingsThisWeek({ votingOpen: true });
+    await assertFails(getDocs(collection(client(), 'sotw_tally')));
   });
 });
