@@ -63,6 +63,7 @@ export function MainScreen() {
             votingOpen={votingOpen}
             weekPaused={!!settings.weekPaused}
             others={others}
+            teammateCount={Object.keys(profiles).length - 1}
             myPick={myPick}
             pendingUid={pendingUid}
             onVote={castVote}

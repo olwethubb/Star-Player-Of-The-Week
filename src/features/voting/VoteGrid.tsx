@@ -8,6 +8,11 @@ interface VoteGridProps {
   votingOpen: boolean;
   weekPaused: boolean;
   others: [string, Profile][];
+  /** Everyone on the roster except me — including people who haven't marked stats
+   * up yet, unlike `others`. What separates the two empty states below: a genuinely
+   * empty roster needs more people added, a populated one just needs them to open
+   * the app and declare their status for the week. */
+  teammateCount: number;
   /** Read from this browser's own storage, not the server — nothing server-side
    * records who you picked. See lib/localPick.ts. */
   myPick: string | null;
@@ -15,7 +20,7 @@ interface VoteGridProps {
   onVote: (uid: string) => void;
 }
 
-export function VoteGrid({ votingOpen, weekPaused, others, myPick, pendingUid, onVote }: VoteGridProps) {
+export function VoteGrid({ votingOpen, weekPaused, others, teammateCount, myPick, pendingUid, onVote }: VoteGridProps) {
   const streaks = useStreaks();
 
   if (weekPaused) {
@@ -25,7 +30,13 @@ export function VoteGrid({ votingOpen, weekPaused, others, myPick, pendingUid, o
     return <EmptyState icon={<IconLock />}>Voting hasn't opened yet this week. Check back once KG opens it.</EmptyState>;
   }
   if (others.length === 0) {
-    return <EmptyState icon={<IconUsers />}>Add more teammates below before voting can start.</EmptyState>;
+    return (
+      <EmptyState icon={<IconUsers />}>
+        {teammateCount === 0
+          ? 'Add more teammates below before voting can start.'
+          : "Nobody's marked their stats up for this week yet — this updates live, so the list fills in the moment someone does."}
+      </EmptyState>
+    );
   }
 
   return (
