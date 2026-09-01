@@ -9,18 +9,10 @@ import { RevealCeremony } from '@/features/reveal/RevealCeremony';
 
 export function App() {
   const session = useSession();
-  const ceremony = useRevealCeremony(session.settings.revealed, session.loadedSettings, session.authEpoch);
-
-  // Anonymous sign-in is still resolving. We genuinely don't know yet whether this
-  // browser already holds a name, so show neutral loading rather than the picker —
-  // someone who chose weeks ago would otherwise flash it on every load.
-  if (session.authResolving) {
-    return (
-      <AppShell>
-        <Spinner label="Getting things ready" errorMsg={session.loadErrorMsg} />
-      </AppShell>
-    );
-  }
+  // resetKey: changes whenever this browser's identity changes (claiming or
+  // releasing a name), so the reveal ceremony's replay guard doesn't carry state
+  // across what's effectively a fresh session for this device.
+  const ceremony = useRevealCeremony(session.settings.revealed, session.loadedSettings, session.myUid);
 
   // The picker renders OUTSIDE AppShell: it's a full-bleed centred layout, and
   // AppShell's max-w-[820px] column would cage it.

@@ -1,12 +1,12 @@
-import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { onSnapshot } from 'firebase/firestore';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { auth, claimsCol, profilesCol, settingsRef, statStatusCol, tallyCol, votersCol } from '@/lib/firebase';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { claimsCol, profilesCol, settingsRef, statStatusCol, tallyCol, votersCol } from '@/lib/firebase';
 import { DEFAULT_SETTINGS, isHostProfile } from '@/types/firestore';
 import type { Claim, Profile, Settings, StatDeclaration, Voter } from '@/types/firestore';
 import { getWeekKey } from '@/lib/week';
 import { RUNOFF_ANNOUNCE_MS } from '@/lib/constants';
 import { clearAllLocalPicks, getLocalPick } from '@/lib/localPick';
+import { localIdentity } from '@/lib/localIdentity';
 import { rollWeek, startRunoff } from '@/services/voting.service';
 import * as claimsService from '@/services/claims.service';
 import { SessionContext, type SessionState } from './SessionContext';
@@ -29,10 +29,6 @@ function toMap<T>(snap: { forEach: (fn: (d: { id: string; data: () => T }) => vo
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [authUid, setAuthUid] = useState<string | null>(null);
-  const [authResolved, setAuthResolved] = useState(false);
-  const [authEpoch, setAuthEpoch] = useState(0);
-
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [loadedProfiles, setLoadedProfiles] = useState(false);
 
@@ -54,38 +50,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [loadErrorMsg, setLoadErrorMsg] = useState<string | null>(null);
   const onErr = handleErr(setLoadErrorMsg);
 
+  // Who this browser is, remembered locally rather than resolved from any kind of
+  // sign-in — there isn't one. See lib/localIdentity.ts for what that trades away.
+  const [myUid, setMyUid] = useState<string | null>(() => localIdentity.get());
+
   const rollingWeek = useRef(false);
   const startingRunoff = useRef(false);
 
-  // Anonymous sign-in, kicked off once on load. Nobody sees this: there's no screen
-  // and nothing to type. It exists only so each browser has a stable uid the security
-  // rules can check, which is what makes "this name is taken" enforceable rather than
-  // cosmetic. Firebase persists the same anonymous uid across reloads, so a claim
-  // survives closing the tab.
+  // The five collections every client watches, all subscribed immediately on mount —
+  // there's no identity to wait on any more before reading. All are small and all are
+  // needed to render the very first screen (the picker needs profiles + claims;
+  // everything after needs settings + statuses), so there's nothing gained by
+  // staggering them.
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setAuthUid(user.uid);
-        setAuthResolved(true);
-        setAuthEpoch((e) => e + 1);
-        return;
-      }
-      signInAnonymously(auth).catch((err) => {
-        console.warn('Anonymous sign-in failed:', err instanceof Error ? err.message : err);
-        setLoadErrorMsg(
-          "Couldn't start a session on this device. Check your connection and reload — if it persists, anonymous sign-in may need enabling in Firebase.",
-        );
-        setAuthResolved(true);
-      });
-    });
-    return unsub;
-  }, []);
-
-  // The four collections every client watches. All are small and all are needed to
-  // render the very first screen (the picker needs profiles + claims; everything
-  // after needs settings + statuses), so there's nothing gained by staggering them.
-  useEffect(() => {
-    if (!authUid) return;
     const subs = [
       onSnapshot(
         profilesCol,
@@ -131,16 +108,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     ];
     return () => subs.forEach((unsub) => unsub());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authUid]);
+  }, []);
 
-  // Which roster name this browser holds, derived from the claims themselves rather
-  // than from anything stored locally — so clearing site data or switching browsers
-  // resolves correctly on its own, and two tabs can never disagree about who you are.
-  const myUid = useMemo(() => {
-    if (!authUid) return null;
-    const mine = Object.entries(claims).find(([, c]) => c.authUid === authUid);
-    return mine ? mine[0] : null;
-  }, [claims, authUid]);
+  // If this browser remembers a name but that claim has since been freed (the host
+  // cleared it, or the teammate was removed), fall back to the picker instead of a
+  // broken "voting as nobody" state.
+  useEffect(() => {
+    if (!loadedClaims || !myUid) return;
+    if (!claims[myUid]) {
+      localIdentity.clear();
+      setMyUid(null);
+    }
+  }, [loadedClaims, claims, myUid]);
 
   const me = myUid ? profiles[myUid] ?? null : null;
   const isHost = isHostProfile(me);
@@ -156,11 +135,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setMyPick(getLocalPick(settings.currentWeek));
   }, [settings.currentWeek, myUid]);
 
-  // Only the host ever subscribes to the per-candidate counts, and only once voting
-  // has closed. Subscribing any earlier isn't merely unnecessary, it's denied:
-  // firestore.rules gates the read on voting being shut precisely so nobody can watch
-  // the live count move and infer who just voted. Attempting it anyway would surface
-  // a permission error to the host as a spurious "couldn't load".
+  // Only while this browser believes it's the host, and only once voting has closed —
+  // firestore.rules also refuses the read while voting is open (nobody can watch the
+  // live count move and infer who just voted), so this stays in step with what the
+  // database would actually hand back either way.
   useEffect(() => {
     if (!loadedSettings || !loadedClaims) return;
     if (!isHost || settings.votingOpen) {
@@ -220,28 +198,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, [loadedSettings, isHost, settings.revealed, settings.winnerUids, settings.runoffUids]);
 
-  const claimName = useCallback(
-    async (profileUid: string) => {
-      if (!authUid) return;
-      // A name change shouldn't inherit the last person's vote state on a shared device.
-      clearAllLocalPicks();
-      setMyPick(null);
-      await claimsService.claimName(profileUid, authUid);
-    },
-    [authUid],
-  );
+  const claimName = useCallback(async (profileUid: string) => {
+    // A name change shouldn't inherit the last person's vote state on a shared device.
+    clearAllLocalPicks();
+    setMyPick(null);
+    await claimsService.claimName(profileUid);
+    localIdentity.set(profileUid);
+    setMyUid(profileUid);
+  }, []);
 
   const releaseName = useCallback(async () => {
     if (!myUid) return;
     clearAllLocalPicks();
     setMyPick(null);
-    await claimsService.releaseName(myUid, isHost);
-  }, [myUid, isHost]);
+    await claimsService.releaseName(myUid);
+    localIdentity.clear();
+    setMyUid(null);
+  }, [myUid]);
 
   const value: SessionState = {
-    authUid,
-    authResolving: !authResolved,
-    authEpoch,
     profiles,
     claims,
     settings,

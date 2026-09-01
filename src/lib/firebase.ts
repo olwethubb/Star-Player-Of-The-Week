@@ -1,6 +1,5 @@
 import { initializeApp } from 'firebase/app';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
-import { connectAuthEmulator, getAuth } from 'firebase/auth';
 import {
   connectFirestoreEmulator,
   getFirestore,
@@ -10,7 +9,7 @@ import {
   type DocumentReference,
   type FirestoreDataConverter,
 } from 'firebase/firestore';
-import type { Claim, Host, Profile, Settings, StatDeclaration, Tally, Voter, WeeklyActivity } from '@/types/firestore';
+import type { Claim, Profile, Settings, StatDeclaration, Tally, Voter, WeeklyActivity } from '@/types/firestore';
 
 function requiredEnv(key: string): string {
   const value = import.meta.env[key];
@@ -49,15 +48,13 @@ if (recaptchaSiteKey && !useEmulators) {
   });
 }
 
-/** Anonymous auth only — nobody ever sees a sign-in screen or types a credential.
- * Its single job is to give each browser a stable uid that firestore.rules can
- * check, which is what turns "OB is taken" into something the database enforces
- * rather than something the UI merely displays. See services/claims.service.ts. */
-export const auth = getAuth(app);
+// No Firebase Auth of any kind — not even the invisible anonymous variety. There's
+// nothing left in this app worth gating behind an identity the database can verify
+// (see Claim in types/firestore.ts), so firestore.rules doesn't check request.auth
+// at all, and there's no console setup step beyond publishing those rules.
 export const db = getFirestore(app);
 
 if (useEmulators) {
-  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
 }
 
@@ -84,8 +81,6 @@ export const weeklyActivityCol = col<WeeklyActivity>('sotw_weekly_activity');
 export const settingsRef: DocumentReference<Settings> = doc(db, 'sotw_meta', 'settings').withConverter(
   passthrough<Settings>(),
 );
-
-export const hostRef: DocumentReference<Host> = doc(db, 'sotw_meta', 'host').withConverter(passthrough<Host>());
 
 export function profileRef(uid: string): DocumentReference<Profile> {
   return doc(profilesCol, uid);

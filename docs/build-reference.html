@@ -117,7 +117,7 @@
       <div class="stack-cell">
         <p class="role">Backend</p>
         <p class="what">Firebase</p>
-        <p class="detail">No custom server, and no Cloud Functions. Firebase signs each browser in anonymously — nobody ever sees a sign-in screen — and stores the data.</p>
+        <p class="detail">No custom server, no Cloud Functions, and no sign-in of any kind — not even an invisible one. Firebase just stores the data.</p>
       </div>
       <div class="stack-cell">
         <p class="role">Database</p>
@@ -152,35 +152,33 @@
     <div class="diagram">
       <div class="node"><p class="node-label">Browser</p><p class="node-name">React app</p><p class="node-sub">built by Vite</p></div>
       <div class="arrow"></div>
-      <div class="node"><p class="node-label">Who you are</p><p class="node-name">Anonymous sign-in</p><p class="node-sub">silent, nothing to type</p></div>
+      <div class="node"><p class="node-label">Who you are</p><p class="node-name">Tap your name</p><p class="node-sub">remembered locally, nothing to sign into</p></div>
       <div class="arrow"></div>
       <div class="node"><p class="node-label">Data</p><p class="node-name">Firestore</p><p class="node-sub">updates live</p></div>
       <div class="arrow"></div>
       <div class="node"><p class="node-label">Checked by</p><p class="node-name">Security Rules</p><p class="node-sub">on the server, not the app</p></div>
     </div>
     <p style="font-size:13.5px;">
-      Nobody signs in. The first time a browser opens the app, Firebase quietly hands it an anonymous
-      ID — no email, no password, nothing to remember or lose. Tapping your name on the roster binds
-      that ID to that name, and that binding is the whole of "who you are" here. It exists for one
-      reason: without an identity the server itself can check, "this name is taken" would be a
-      suggestion on screen that anyone could click straight past.
+      Nobody signs in — not with a password, not even invisibly. Tapping a name on the roster just
+      writes a note to your own browser's storage saying that's who you are; there's no account behind
+      it and no server checking that the tap belongs to the right person. That was a deliberate trade:
+      once the app stopped holding anything worth protecting that way, keeping any form of sign-in
+      around stopped paying for itself.
     </p>
     <p style="font-size:13.5px;">
       There's no backend server deciding permissions — the app talks to the database directly, and a
       separate file called <strong style="color:var(--ink)">Security Rules</strong> decides what a given
-      browser is actually allowed to do. That matters: nobody can get more access just by changing what
-      the app's own code does. Only changing the rules themselves changes what's allowed.
+      request is actually allowed to do. That matters less than it used to: with no identity behind any
+      request, these rules mostly check the SHAPE of a write (is this really just a name? did the count
+      only move by one?) rather than WHO is making it. The one thing they still gate on timing rather
+      than identity is the vote count — see "What's protected" below.
     </p>
     <p style="font-size:13.5px;">
-      One name on the roster is different: whoever claims <strong style="color:var(--ink)">KG</strong>
-      runs the session — opens and closes voting, pauses a week, calls the reveal — and is the only one
-      who ever sees the totals. They don't vote themselves. There's no role to assign and no account to
-      promote; claiming that name is the whole of it. The database learns who it is from a single record
-      that KG's own browser writes, guarded so tightly that even the sitting host can't rewrite it to
-      hand the seat to a browser that never actually claimed KG — the only two ways in are genuinely
-      holding that claim yourself, or standing down and letting whoever holds it next take over. That
-      second path is what lets a replaced phone recover: someone re-claims the name KG, then registers
-      themselves as host in its place.
+      One name on the roster is still different: whoever's browser has claimed
+      <strong style="color:var(--ink)">KG</strong> sees the controls to run the session — opens and
+      closes voting, pauses a week, calls the reveal. They don't vote themselves. There's no role to
+      assign and no account to promote; the app's own screen decides this purely by checking which name
+      you've locally claimed, the same as everything else about "who you are" here.
     </p>
   </section>
 
@@ -191,11 +189,10 @@
         <thead><tr><th>Collection</th><th>What it holds</th><th>Who can read it</th></tr></thead>
         <tbody>
           <tr><td class="coll">sotw_profiles</td><td>The roster — each teammate's name, plus their photo if they've added one. Nothing else</td><td class="who">Everyone</td></tr>
-          <tr><td class="coll">sotw_claims</td><td>Which browser holds which name. Written once, when you tap your name, and never changed after</td><td class="who">Everyone</td></tr>
+          <tr><td class="coll">sotw_claims</td><td>Which name has been tapped. Written once, when someone taps it, and never changed after — only ever deleted and re-created</td><td class="who">Everyone</td></tr>
           <tr><td class="coll">sotw_meta/settings</td><td>Is voting open, which week it is, is the week paused, has it been revealed, who won</td><td class="who">Everyone</td></tr>
-          <tr><td class="coll">sotw_meta/host</td><td>Which browser is running the session — written by whoever claims the name KG</td><td class="who">Everyone</td></tr>
           <tr><td class="coll">sotw_voters</td><td>That a person has voted this week. There is no field here for who they voted for</td><td class="who">Everyone</td></tr>
-          <tr><td class="coll">sotw_tally</td><td>The running count of votes for each candidate — numbers only, no names attached to them</td><td class="who">KG, once voting closes</td></tr>
+          <tr><td class="coll">sotw_tally</td><td>The running count of votes for each candidate — numbers only, no names attached to them</td><td class="who">Everyone, once voting closes</td></tr>
           <tr><td class="coll">sotw_stat_status</td><td>Each person's own "stats up" or "stats down" for the current week</td><td class="who">Everyone</td></tr>
           <tr><td class="coll">sotw_weekly_activity</td><td>That someone received at least one vote in a given week — what the streak badges are counted from</td><td class="who">Everyone</td></tr>
         </tbody>
@@ -208,11 +205,20 @@
   <section>
     <h2 class="section-head"><span class="num">04</span> What's protected</h2>
     <div class="guarantee-list">
-      <div class="guarantee"><span class="check">✓</span><p><strong>One name, one person.</strong> Tapping a name binds it to that browser, and the database allows that record to be created but never overwritten. So the first browser to take a name owns it, and nobody else can vote as that person — not by clicking past a greyed-out button, not by editing the app's own code. Freeing a name that's stuck on a phone somebody no longer has is a deliberate act, and only KG can do it.</p></div>
-      <div class="guarantee"><span class="check">✓</span><p><strong>Nobody can learn who voted for whom.</strong> It is never recorded — not for teammates, not for KG, not for anyone reading the raw database. Two things get stored: that a person voted, and a running count for each candidate. KG is the only one who can read those counts, and only once voting has closed, so nobody can watch a number tick up and work out who just voted.</p></div>
+      <div class="guarantee"><span class="check">✓</span><p><strong>Nobody can learn who voted for whom.</strong> It is never recorded — not for teammates, not for KG, not for anyone reading the raw database. Two things get stored: that a person voted, and a running count for each candidate, and neither field can be stretched to carry the other (the rules reject any extra field on either doc). This is a real guarantee, not a convention — it holds regardless of who's asking, because nobody is ever checked.</p></div>
+      <div class="guarantee"><span class="check">✓</span><p><strong>The count is unreadable while voting is open.</strong> Whether it's KG, a teammate, or someone poking the database directly, the read is refused until voting closes — so nobody can watch a number tick up and work out who just voted. Once it closes, anyone can technically read it; the app's own screen still only shows it to whoever's claimed KG.</p></div>
     </div>
     <p style="font-size:13px;margin-top:12px;">
-      The second guarantee carries one accepted trade-off. Because the server holds no record of your
+      What's <em>not</em> a database-level guarantee any more, now that this app dropped every form of
+      sign-in: "one name, one person" and "only KG runs the session" are conventions the app's own
+      screens follow, not things the rules can verify — there's no identity left to check them against.
+      A name being claimed by <em>somebody</em> can't be un-claimed out from under them by a second tap
+      (the record is create-only), but nothing stops a browser from claiming a different name that isn't
+      really theirs by going around the app's UI. For a small team with nothing valuable riding on it,
+      that was judged an acceptable trade for having no sign-in step at all.
+    </p>
+    <p style="font-size:13px;margin-top:10px;">
+      One further accepted trade-off, unrelated to identity: because the server holds no record of your
       pick, it can't check a vote being taken back against the vote you actually cast — it can only hold
       each change to a single point up or down. Someone hand-crafting requests could nudge a rival's
       count by one. Closing that would mean storing who voted for whom, which is precisely the thing this
@@ -222,15 +228,16 @@
 
   <section>
     <h2 class="section-head"><span class="num">05</span> Shipping a change</h2>
-    <p style="font-size:13.5px;">Two separate steps, kept apart on purpose:</p>
-    <div class="cmd-block"><span class="c"># app code — what people see and use</span>
-firebase deploy <span class="flag">--only hosting</span>
-
-<span class="c"># security rules — who's allowed to do what</span>
-firebase deploy <span class="flag">--only firestore:rules</span></div>
+    <p style="font-size:13.5px;">Usually shipped together — the app and the rules it depends on:</p>
+    <div class="cmd-block"><span class="c"># app code, and the rules it depends on, in one go</span>
+firebase deploy <span class="flag">--only hosting,firestore:rules</span></div>
     <p style="font-size:13px;margin-top:12px;">
-      Keeping these separate means a normal update to the app can never accidentally change who's allowed
-      to do what. That only ever happens on purpose, as its own step.
+      They can still be deployed separately (<code>--only hosting</code>, or
+      <code>--only firestore:rules</code> on their own) when that's genuinely useful — publishing a rules
+      change ahead of the app code that needs it, say. But there's no longer a standing reason to keep
+      them apart by default: with no accounts and no roles left to guard, a routine app update can't
+      accidentally change who's allowed to do what, because nothing here is gated on who's asking any
+      more.
     </p>
   </section>
 
@@ -241,7 +248,8 @@ firebase deploy <span class="flag">--only firestore:rules</span></div>
       <div class="log-entry"><p class="log-title">Security check-up</p><p>A full review found and fixed real gaps — including a way anyone could inflate vote counts.</p></div>
       <div class="log-entry"><p class="log-title">Made the session controls self-serve</p><p>Adding, renaming and removing people, opening and closing voting, and recovering from a stuck state can now all be done from the app — no direct database edit needed.</p></div>
       <div class="log-entry"><p class="log-title">Stats up or down, streaks, photos</p><p>Everyone says whether their stats are up before they vote, and only "up" goes on the poll. Photos, a badge for anyone who's received votes three weeks running, and a "pause this week" switch for holidays landed alongside it.</p></div>
-      <div class="log-entry"><p class="log-title">Stripped back to just the vote</p><p>Sign-in, accounts and the Blacfox Dollars wallet are gone, and every screen that wasn't the vote went with them. Open the app, tap your name, vote — that's the whole app now, and the rules got shorter and stricter for it.</p></div>
+      <div class="log-entry"><p class="log-title">Stripped back to just the vote</p><p>Accounts and the Blacfox Dollars wallet are gone, and every screen that wasn't the vote went with them. Open the app, tap your name, vote — that's the whole app now.</p></div>
+      <div class="log-entry"><p class="log-title">Dropped the last trace of sign-in</p><p>Even the invisible kind — tapping your name used to hand your browser an anonymous Firebase identity behind the scenes, purely so the rules could enforce one name per browser. With nothing left worth protecting that way, that step is gone too, and "who you are" now just lives in your own browser's storage. The trade: one name per person is a convention the app follows now, not something the database can verify.</p></div>
     </div>
   </section>
 

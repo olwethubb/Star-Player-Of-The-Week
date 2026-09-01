@@ -1,14 +1,12 @@
 /** Captures the app's real screens as phone-sized images for the team handbook.
  *
  * Needs the emulator running and a dev server pointed at it:
- *   firebase emulators:start --only auth,firestore
+ *   firebase emulators:start --only firestore
  *   VITE_USE_EMULATORS=1 npx vite --port 5210
  *   node scripts/capture-doc-shots.mjs
  *
  * Seeds its own demo team, so it fully controls the state each shot is taken in.
- * The auth emulator is still needed even though nobody signs in — the app does a
- * silent anonymous sign-in on load to get the device identity that name claims hang
- * off, and without it every screen stops at the loading state.
+ * There's no Auth emulator to start any more — the app has no sign-in of any kind.
  */
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';

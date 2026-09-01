@@ -2,34 +2,23 @@
  * The `Bearer owner` header is the emulator's project-owner sentinel, which is what
  * lets seeding write docs that firestore.rules would (correctly) reject from a client. */
 const PROJECT = 'star-player-of-the-week';
-export const AUTH = `http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1`;
 export const FS = `http://127.0.0.1:8080/v1/projects/${PROJECT}/databases/(default)/documents`;
 const OWNER = { Authorization: 'Bearer owner' };
-const KEY = 'fake-api-key';
 
+// Firestore only — there's no Auth emulator to reset any more. The app has no
+// sign-in of any kind, so seeding never touches Auth at all.
 export async function resetEmulators() {
-  await fetch(`http://127.0.0.1:9099/emulator/v1/projects/${PROJECT}/accounts`, {
-    method: 'DELETE',
-    headers: OWNER,
-  });
   await fetch(`http://127.0.0.1:8080/emulator/v1/projects/${PROJECT}/databases/(default)/documents`, {
     method: 'DELETE',
     headers: OWNER,
   });
 }
 
-/** The app has no accounts any more — a teammate is just a profile document, and a
- * uid is only ever a document id. Generated here rather than minted by Auth, so
- * seeding doesn't need the Auth emulator at all. */
+/** The app has no accounts — a teammate is just a profile document, and a uid is
+ * only ever a document id. Generated here rather than minted by anything, since
+ * there's nothing left that mints one. */
 export function fakeUid(name) {
   return `demo-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
-}
-
-/** Binds a roster name to a browser. Seeding one lets a screenshot run land straight
- * on the voting screen instead of the picker; seeding one for a name you then want to
- * appear as free would make it show up as "Taken". */
-export function claimFor(authUid) {
-  return { authUid, claimedAt: null };
 }
 
 function toFields(obj) {

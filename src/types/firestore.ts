@@ -10,24 +10,12 @@ export interface Profile {
   avatarUrl?: string;
 }
 
-/** Binds one roster name to one browser, so two people can't both be "OB".
- * `authUid` is an anonymous Firebase Auth uid — nobody signs in or types anything,
- * it's just a stable per-browser identity the security rules can actually check.
- * Without a server-checkable identity here, "this name is taken" would be a UI
- * suggestion that anyone could click straight past. First write wins: the doc is
- * create-only, so whoever's transaction lands first owns the name. */
+/** Marks one roster name as taken. There's no sign-in of any kind behind this app any
+ * more, so this is a convention the app's own UI respects (first tap wins the create,
+ * and the UI greys out anyone already claimed), not something the database can verify
+ * belongs to a particular person — see lib/localIdentity.ts for the trade-off. */
 export interface Claim {
-  authUid: string;
   claimedAt: Timestamp | null;
-}
-
-/** Written by whoever claims the profile named KG, and the single doc the security
- * rules consult to answer "is this caller the host". Rules can't run a query to go
- * find the profile called KG, so the host records themselves here instead — and the
- * write is guarded on actually holding that claim. */
-export interface Host {
-  authUid: string;
-  profileUid: string;
 }
 
 export interface Tally {

@@ -10,64 +10,41 @@ rules_version = '2';
 // Firestore projects start with rules that block every read/write (or expire after
 // 30 days), and the app never got these rules published on top of that.
 //
-// Anonymous auth is REQUIRED for this app: Firebase console → Build → Authentication
-// → Sign-in method → enable "Anonymous". Nobody ever sees a sign-in screen; the
-// anonymous uid exists purely so the two rules below can be enforced rather than
-// merely displayed:
+// There is NO sign-in of any kind behind this app — not a login screen, not even an
+// invisible one. That's a deliberate choice: once the wallet/payout system was
+// dropped, there was nothing left worth gating behind an identity the database could
+// verify, so these rules don't check request.auth at all. Two consequences worth
+// knowing, not hiding:
 //
-//   1. One name, one person. sotw_claims binds a roster name to a browser. The doc
-//      is create-only, so the first claim wins and nobody else can vote as that name.
-//   2. The host sees counts, never ballots. Nothing in this database records who
-//      voted for whom — see sotw_voters. The per-candidate counts (sotw_tally) are
-//      readable only by the host, and only once voting has closed.
+//   1. "One name, one person" is a convention, not a guarantee. sotw_claims is
+//      create-only so two taps can't both win the SAME name, but nothing stops a
+//      second browser from claiming a DIFFERENT already-taken name by going around
+//      the app's own UI. Small trusted team, nothing at stake — that trade was made
+//      on purpose.
+//   2. The host's controls (open/close voting, reveal, manage the roster) are
+//      enforced by the app's UI only showing them to whoever's claimed KG — not by
+//      the database refusing anyone else.
+//
+// What DID survive, and is still enforced right here regardless of the above: nobody
+// voted for whom is ever recorded anywhere (see sotw_voters), and the per-candidate
+// counts (sotw_tally) still can't be read while voting is open — that's about not
+// leaking who's voting for whom mid-week, which has nothing to do with identity.
 // -----------------------------------------------------------------
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function signedIn() {
-      return request.auth != null;
-    }
-    function profileExists(uid) {
-      return exists(/databases/$(database)/documents/sotw_profiles/$(uid));
-    }
-    function profileName(uid) {
-      return get(/databases/$(database)/documents/sotw_profiles/$(uid)).data.name;
-    }
-    // The one name that runs the session. Matched on the roster name because that
-    // IS the rule the team agreed ("whoever picks KG reveals") — there's no admin
-    // role to assign and no account to promote.
-    function isHostNamed(uid) {
-      return profileExists(uid) && profileName(uid).lower().trim() == 'kg';
-    }
-    // True when the caller's browser currently owns this roster name.
-    function holdsClaim(uid) {
-      return signedIn()
-        && exists(/databases/$(database)/documents/sotw_claims/$(uid))
-        && get(/databases/$(database)/documents/sotw_claims/$(uid)).data.authUid == request.auth.uid;
-    }
-    function hostDoc() {
-      return /databases/$(database)/documents/sotw_meta/host;
-    }
-    // Whoever claimed the profile named KG registered themselves here. Rules can't
-    // run a query ("find the profile called KG"), so the host records their own uid
-    // in one well-known doc and every host-only check reads that single doc. The
-    // write itself is what's guarded — see the sotw_meta/host match block.
-    function isHost() {
-      return signedIn() && exists(hostDoc()) && get(hostDoc()).data.authUid == request.auth.uid;
-    }
     function settingsData() {
       return get(/databases/$(database)/documents/sotw_meta/settings).data;
     }
     // Only true while the host has explicitly opened this week's voting window
-    // ("Start Voting" / "End Voting"). Nobody can cast a vote outside that window —
-    // enforced here, not just in the UI. Uses .get() with a default since a settings
+    // ("Start Voting" / "End Voting"). Uses .get() with a default since a settings
     // doc written before this field existed genuinely has no `votingOpen` key.
     function votingIsOpen() {
       return settingsData().get('votingOpen', false) == true;
     }
     // Null outside a runoff. During a runoff it's the tied uids from last round —
-    // voting is still open to everyone (except the host), but only for one of these.
+    // voting is still open to everyone, but only for one of these.
     function currentRunoffUids() {
       return settingsData().get('runoffUids', null);
     }
@@ -84,129 +61,68 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/sotw_stat_status/$(uid)).data.weekKey == currentWeekKey();
     }
 
-    // The roster. Everyone reads it — it's both the vote screen and the "who am I"
-    // picker. Only the host adds, renames or removes people. Anyone may set the
-    // avatar on the name they've claimed (and nothing else on it).
-    //
-    // The second create branch is a narrow bootstrap escape hatch, mirroring the one
-    // on sotw_meta/settings: on a brand-new project there is no host yet, and without
-    // this nobody could ever create one — creating a profile normally needs isHost(),
-    // becoming host needs a claim on a profile named KG, and a claim needs that
-    // profile to already exist. So before any host is registered, any signed-in
-    // client may create ONLY a profile shaped exactly `{ name: 'KG' }`. Claiming it
-    // and registering as host (see sotw_meta/host below) closes this window for good.
+    // The roster. Shape-checked so a stray write can't corrupt it, but not access-
+    // controlled — see the file header. The app's own UI only exposes add/rename/
+    // remove to whoever it thinks is the host.
     match /sotw_profiles/{uid} {
-      allow read: if signedIn();
-      allow create: if isHost()
-                    || (signedIn() && !exists(hostDoc())
-                        && request.resource.data.keys().hasOnly(['name'])
-                        && request.resource.data.name.lower().trim() == 'kg');
-      allow delete: if isHost();
-      allow update: if isHost()
-                    || (holdsClaim(uid)
-                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['avatarUrl'])
-                        && request.resource.data.avatarUrl is string
-                        && request.resource.data.avatarUrl.size() < 200000);
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly(['name'])
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0;
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'avatarUrl']);
+      allow delete: if true;
     }
 
-    // One name, one person. Creating this doc is how you become someone on the
-    // roster; there is no password because there is nothing here worth stealing —
-    // the point is only that two people can't both be OB.
-    //
-    // create-only by design: Firestore fires `create` exclusively when the document
-    // does not already exist, so two people racing for the same name resolve to
-    // whoever lands first, and `update: false` means the loser can never overwrite
-    // it. Releasing a name (handing over the device, or the host freeing one that's
-    // stuck on a browser somebody no longer has) is a delete, then a fresh create.
+    // Marks a name as taken. create-only: Firestore fires `create` exclusively when
+    // the document doesn't already exist, so two taps landing on the same name at the
+    // same moment resolve to whoever's write lands first, and `update: false` means
+    // the loser can never overwrite it. That's the one piece of this app's identity
+    // model the database still actually enforces — see the file header for what it
+    // doesn't. Releasing a name (handing over the device, or the host freeing one
+    // stuck on a browser nobody has any more) is a delete, then a fresh create.
     match /sotw_claims/{uid} {
-      allow read: if signedIn();
-      allow create: if signedIn()
-                    && profileExists(uid)
-                    && request.resource.data.authUid == request.auth.uid
-                    && request.resource.data.keys().hasOnly(['authUid', 'claimedAt']);
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly(['claimedAt']);
       allow update: if false;
-      allow delete: if holdsClaim(uid) || isHost();
+      allow delete: if true;
     }
 
-    // Session state everyone reads (is voting open, who won, what week is it).
-    // Written by the host — plus, before anyone has claimed KG, by any signed-in
-    // client, so the very first week can roll over and open on a fresh project
-    // that has no host yet. Once KG is claimed that bootstrap window closes.
-    match /sotw_meta/settings {
-      allow read: if signedIn();
-      allow write: if isHost() || (signedIn() && !exists(hostDoc()));
+    // Session state everyone reads and, in practice, only the host writes.
+    match /sotw_meta/{doc} {
+      allow read, write: if true;
     }
 
-    // How the host proves they're the host, and the only doc isHost() consults.
-    // Guarded on the two things that actually matter: the caller must currently
-    // hold the claim on the profile they name here, and that profile must be the
-    // one called KG. So registering as host requires having genuinely claimed KG
-    // first — you can't nominate yourself, and you can't nominate anyone else.
-    match /sotw_meta/host {
-      allow read: if signedIn();
-      allow create, update: if signedIn()
-                            && request.resource.data.authUid == request.auth.uid
-                            && request.resource.data.keys().hasOnly(['authUid', 'profileUid'])
-                            && holdsClaim(request.resource.data.profileUid)
-                            && isHostNamed(request.resource.data.profileUid);
-      // Standing down releases the role — either the host themselves, or whoever
-      // holds the KG claim now (so a host whose browser was wiped can be replaced).
-      allow delete: if isHost() || (exists(hostDoc()) && holdsClaim(get(hostDoc()).data.profileUid));
-    }
-
-    // `other` also matches literally, including `host` — Firestore grants access if
-    // ANY matching rule allows, so without the exclusion below this generic block
-    // would sit beside sotw_meta/host's own rule and let a sitting host overwrite
-    // that doc (e.g. hand host to a profileUid they never actually claimed) without
-    // going through holdsClaim/isHostNamed/keys().hasOnly() at all.
-    match /sotw_meta/{other} {
-      allow read: if signedIn();
-      allow write: if isHost() && other != 'host';
-    }
-
-    // Proof that someone voted this week — and deliberately nothing else. There is
-    // no field for who they picked, here or anywhere: that lives only in the voter's
-    // own browser (see lib/localPick.ts). This is what makes "the host sees the
-    // numbers but never who voted for who" true of the database itself, not just of
-    // the screen. Readable by all so the host can chase whoever hasn't voted yet.
-    //
-    // Only the browser holding this name's claim can mark it as voted, only while
-    // voting is open, and never for the host (who runs the session instead of
-    // voting in it).
+    // Proof that someone voted this week — and deliberately nothing else. There is no
+    // field for who they picked, here or anywhere: that lives only in the voter's own
+    // browser (see lib/localPick.ts). This is what makes "nobody knows who voted for
+    // whom" true of the database itself, not just of the screen — and it holds
+    // regardless of the rest of this file having no identity checks at all.
     match /sotw_voters/{uid} {
-      allow read: if signedIn();
-      allow create, update: if holdsClaim(uid)
-                            && !isHostNamed(uid)
-                            && votingIsOpen()
+      allow read: if true;
+      allow create, update: if votingIsOpen()
                             && request.resource.data.keys().hasOnly(['weekKey', 'ts'])
                             && request.resource.data.weekKey == currentWeekKey();
-      allow delete: if isHost();
+      allow delete: if true;
     }
 
     // Anonymous running counts, one doc per candidate. Nudged by exactly the +1/-1
-    // that casting or changing a single vote produces — never an arbitrary value,
-    // and never for someone who isn't on the roster or isn't 'up' this week.
+    // that casting or changing a single vote produces — never an arbitrary value, and
+    // never for someone who isn't on the roster or isn't 'up' this week.
     //
-    // Readable ONLY by the host, and only once voting has closed. That ordering is
-    // deliberate twice over: watching the live count as it moves is itself a way to
-    // infer who just voted for whom, and the count has to become readable the moment
-    // voting closes rather than at reveal, because doReveal computes the winner FROM
-    // this collection and only then writes revealed:true.
-    //
-    // Known residual risk, accepted: a decrement can't be bound to the caller's own
-    // prior pick the way it could when the server stored that pick, because now it
-    // deliberately doesn't. Someone editing requests by hand could nudge a rival's
-    // count down. Closing that would mean recording who voted for whom — exactly the
-    // thing this design refuses to do — so the ±1 clamp is where the line sits.
+    // Readable ONLY once voting has closed. That's not about who's asking (nothing
+    // here can tell), it's about ordering: watching the live count move while voting
+    // is still open is itself a way to infer who just voted, no matter who's looking.
+    // It has to become readable the moment voting closes rather than at reveal,
+    // because doReveal computes the winner FROM this collection and only then writes
+    // revealed:true.
     match /sotw_tally/{uid} {
-      allow read: if isHost() && !votingIsOpen();
-      allow create: if signedIn() && votingIsOpen()
-                    && profileExists(uid) && isUpThisWeek(uid)
+      allow read: if !votingIsOpen();
+      allow create: if votingIsOpen()
+                    && isUpThisWeek(uid)
                     && (currentRunoffUids() == null || uid in currentRunoffUids())
                     && request.resource.data.keys().hasOnly(['count'])
                     && request.resource.data.count == 1;
-      allow update: if signedIn() && votingIsOpen()
-                    && profileExists(uid)
+      allow update: if votingIsOpen()
                     && request.resource.data.keys().hasOnly(['count'])
                     && request.resource.data.count is int
                     && request.resource.data.count >= 0
@@ -220,30 +136,25 @@ service cloud.firestore {
                         && (currentRunoffUids() == null || uid in currentRunoffUids()))
                       || (request.resource.data.count - resource.data.count == -1)
                     );
-      allow delete: if isHost();
+      allow delete: if true;
     }
 
-    // Self-declared "are my stats up or down this week". Only the browser holding
-    // that name's claim can set it — the host deliberately can't set it on someone
-    // else's behalf, since it's meant to be an honest self-report. Readable by
-    // anyone so the vote screen can build the eligible-candidate list client-side
-    // (the real enforcement is isUpThisWeek, used above).
+    // Self-declared "are my stats up or down this week". Readable by anyone so the
+    // vote screen can build the eligible-candidate list client-side (the real
+    // enforcement is isUpThisWeek, used above).
     match /sotw_stat_status/{uid} {
-      allow read: if signedIn();
-      allow create, update: if holdsClaim(uid)
-                            && request.resource.data.keys().hasOnly(['weekKey', 'status'])
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasOnly(['weekKey', 'status'])
                             && request.resource.data.status in ['up', 'down']
                             && request.resource.data.weekKey == currentWeekKey();
-      allow delete: if isHost();
+      allow delete: if true;
     }
 
     // One doc per person per week, written by the reveal alongside reading the tally
     // (the tally itself gets wiped on rollover; this is what's left after). Records
-    // only THAT someone received at least one vote, never from whom. Readable by all
-    // so streak badges can show on any profile, not just the host's view.
+    // only THAT someone received at least one vote, never from whom.
     match /sotw_weekly_activity/{id} {
-      allow read: if signedIn();
-      allow create, update: if isHost();
+      allow read, write: if true;
     }
   }
 }
