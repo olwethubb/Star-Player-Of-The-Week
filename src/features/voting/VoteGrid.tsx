@@ -6,7 +6,6 @@ import type { Profile } from '@/types/firestore';
 
 interface VoteGridProps {
   votingOpen: boolean;
-  weekPaused: boolean;
   others: [string, Profile][];
   /** Everyone on the roster except me — including people who haven't marked stats
    * up yet, unlike `others`. What separates the two empty states below: a genuinely
@@ -20,12 +19,9 @@ interface VoteGridProps {
   onVote: (uid: string) => void;
 }
 
-export function VoteGrid({ votingOpen, weekPaused, others, teammateCount, myPick, pendingUid, onVote }: VoteGridProps) {
+export function VoteGrid({ votingOpen, others, teammateCount, myPick, pendingUid, onVote }: VoteGridProps) {
   const streaks = useStreaks();
 
-  if (weekPaused) {
-    return <EmptyState icon={<IconLock />}>No vote this week — see you next Friday!</EmptyState>;
-  }
   if (!votingOpen) {
     return <EmptyState icon={<IconLock />}>Voting hasn't opened yet this week. Check back once KG opens it.</EmptyState>;
   }

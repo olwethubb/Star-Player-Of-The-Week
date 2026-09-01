@@ -51,14 +51,6 @@ export function useSessionControls() {
   return {
     start: useCallback(() => run(votingService.startVoting, 'Could not start voting. Try again in a moment.'), [run]),
     end: useCallback(() => run(votingService.endVoting, 'Could not end voting. Try again in a moment.'), [run]),
-    pauseWeek: useCallback(
-      () => run(votingService.pauseWeek, 'Could not pause this week. Try again in a moment.'),
-      [run],
-    ),
-    resumeWeek: useCallback(
-      () => run(votingService.resumeWeek, 'Could not resume this week. Try again in a moment.'),
-      [run],
-    ),
     pending,
   };
 }

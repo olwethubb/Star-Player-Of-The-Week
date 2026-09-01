@@ -45,10 +45,6 @@ export interface Settings {
   runoffUids: string[] | null;
   votingOpen: boolean;
   currentWeek: string | null;
-  /** The host marked this week as intentionally skipped (holiday, etc.) — shown
-   * instead of the ambiguous "voting hasn't opened yet", which reads as "the host
-   * forgot" rather than "nothing was scheduled this week". Cleared on rollover. */
-  weekPaused: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -59,7 +55,6 @@ export const DEFAULT_SETTINGS: Settings = {
   runoffUids: null,
   votingOpen: false,
   currentWeek: null,
-  weekPaused: false,
 };
 
 export type StatLevel = 'up' | 'down';

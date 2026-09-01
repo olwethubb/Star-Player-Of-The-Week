@@ -27,7 +27,7 @@ export function MainScreen() {
   const myDeclaredStatus = statStatuses[myUid]?.weekKey === settings.currentWeek ? statStatuses[myUid]!.status : null;
   // Voting is open and they haven't declared their status yet this week — the grid
   // stays hidden until they do, StatStatusGate above is all there is to see.
-  const awaitingMyStatus = votingOpen && !settings.weekPaused && !myDeclaredStatus;
+  const awaitingMyStatus = votingOpen && !myDeclaredStatus;
 
   return (
     <>
@@ -36,17 +36,15 @@ export function MainScreen() {
         Star Player of the Week
       </h1>
       <p className="mb-7 max-w-[520px] text-sm leading-relaxed text-text-muted">
-        Vote for the teammate who went above and beyond this week. Nobody sees who you picked — not even KG, who
-        only ever sees the totals.
+        Vote for the teammate who went above and beyond this week.
       </p>
 
-      {votingOpen && !settings.weekPaused && !isHost && <StatStatusGate uid={myUid} current={myDeclaredStatus} />}
+      {votingOpen && !isHost && <StatStatusGate uid={myUid} current={myDeclaredStatus} />}
 
       {isHost ? (
         <>
           <p className="mb-5 rounded-xl border border-border-soft bg-bg-elevated px-4 py-3 text-[13px] text-text-muted">
-            You're running this week's session, so you don't cast a vote. Once you close voting you'll see the
-            totals — who's leading, and whether it's a tie — but never who voted for whom.
+            You're running this week's session, so you don't cast a vote.
           </p>
           {votingOpen && (
             <VotingProgress voters={voters} weekKey={settings.currentWeek} eligibleCount={Object.keys(claims).length - 1} />
@@ -61,7 +59,6 @@ export function MainScreen() {
           )}
           <VoteGrid
             votingOpen={votingOpen}
-            weekPaused={!!settings.weekPaused}
             others={others}
             teammateCount={Object.keys(profiles).length - 1}
             myPick={myPick}
@@ -71,9 +68,7 @@ export function MainScreen() {
         </>
       )}
 
-      {isHost && (
-        <SessionControls votingOpen={votingOpen} weekPaused={!!settings.weekPaused} revealing={!!settings.revealing} />
-      )}
+      {isHost && <SessionControls votingOpen={votingOpen} revealing={!!settings.revealing} />}
       <Suspense fallback={null}>{isHost && <LazyManageTeamPanel />}</Suspense>
     </>
   );

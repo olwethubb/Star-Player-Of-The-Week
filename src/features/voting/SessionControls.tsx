@@ -62,14 +62,12 @@ function StuckRevealBanner({ revealing }: { revealing: boolean }) {
  * still trickling in. */
 export function SessionControls({
   votingOpen,
-  weekPaused,
   revealing,
 }: {
   votingOpen: boolean;
-  weekPaused: boolean;
   revealing: boolean;
 }) {
-  const { start, end, pauseWeek, resumeWeek, pending: sessionPending } = useSessionControls();
+  const { start, end, pending: sessionPending } = useSessionControls();
   const { reveal, pending: revealPending } = useDoReveal();
   const [confirmingEnd, setConfirmingEnd] = useState(false);
 
@@ -91,19 +89,6 @@ export function SessionControls({
     );
   }
 
-  if (weekPaused) {
-    return (
-      <div className="mb-5 flex flex-col gap-2.5">
-        <p className="m-0 rounded-xl border border-border-soft bg-bg-elevated px-4 py-3 text-[13px] text-text-muted">
-          This week is marked as paused — nobody sees a vote screen until you resume it.
-        </p>
-        <Button variant="ghost" className="w-full" disabled={sessionPending} onClick={() => resumeWeek()}>
-          Resume this week
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <div className="mb-5 flex flex-col gap-2.5">
       <StuckRevealBanner revealing={revealing} />
@@ -112,9 +97,6 @@ export function SessionControls({
       </Button>
       <Button variant="primary" className="mb-0" disabled={revealPending} onClick={() => reveal()}>
         {revealPending ? 'Revealing…' : 'Reveal Results'}
-      </Button>
-      <Button variant="small" disabled={sessionPending} onClick={() => pauseWeek()}>
-        Pause this week (holiday, etc.)
       </Button>
     </div>
   );

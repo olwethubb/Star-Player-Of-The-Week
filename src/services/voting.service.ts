@@ -145,17 +145,6 @@ export function endVoting() {
   return setDoc(settingsRef, { votingOpen: false }, { merge: true });
 }
 
-/** Marks the current week as intentionally skipped (holiday, etc.) so the vote screen
- * shows "no vote this week" instead of the ambiguous "hasn't opened yet", which reads
- * as "the host forgot". Cleared automatically on the next rollover. */
-export function pauseWeek() {
-  return setDoc(settingsRef, { weekPaused: true, votingOpen: false }, { merge: true });
-}
-
-export function resumeWeek() {
-  return setDoc(settingsRef, { weekPaused: false }, { merge: true });
-}
-
 /** Nobody clicks a button for this — the moment the voting week changes (Friday, per
  * getWeekKey's Thursday-to-Friday boundary), the HOST's client silently clears the
  * previous week's markers and opens a fresh one. It has to be the host's: wiping
@@ -179,7 +168,6 @@ export async function rollWeek(newWeekKey: string) {
       runoffUids: null,
       votingOpen: true,
       currentWeek: newWeekKey,
-      weekPaused: false,
     },
     { merge: true },
   );
