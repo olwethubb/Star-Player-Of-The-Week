@@ -104,11 +104,20 @@ export function NamePicker() {
             onChange={(e) => setSelected(e.target.value)}
             className="min-h-12 min-w-0 flex-1 rounded-xl border border-border bg-bg-elevated px-3.5 text-base text-text focus:border-accent focus:outline-none"
           >
-            <option value="" disabled className="bg-bg-elevated text-text">
+            {/* The closed box sits on the picker's dark glass card, so it needs the
+                light "on dark" text this scope provides via text-text above. The
+                OPEN dropdown list is a different story: browsers render that popup
+                with their own (usually white) chrome and ignore a custom background
+                on it, while still applying whatever text color we set — so light
+                text here would be near-invisible on a white popup. These options
+                get a color that doesn't depend on the dark-card scope at all,
+                matching the app's normal (light-background) theme instead, because
+                that's the reality of what actually renders. */}
+            <option value="" disabled style={{ color: '#201a14', backgroundColor: '#ffffff' }}>
               Select your name
             </option>
             {available.map(([uid, profile]) => (
-              <option key={uid} value={uid} className="bg-bg-elevated text-text">
+              <option key={uid} value={uid} style={{ color: '#201a14', backgroundColor: '#ffffff' }}>
                 {profile.name}
                 {isHostName(profile.name) ? ' — runs the reveal' : ''}
               </option>
