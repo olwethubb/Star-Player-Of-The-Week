@@ -1,12 +1,12 @@
 import { Suspense } from 'react';
 import { TopBar } from '@/components/layout/TopBar';
 import { LazyManageTeamPanel } from '@/features/team-admin/ManageTeamPanel.lazy';
+import { VotingProgress } from '@/features/voting/VotingProgress';
 import { useSession } from '@/hooks/useSession';
 import { WinnerBlock } from './WinnerBlock';
-import { Scoreboard } from './Scoreboard';
 
 export function ResultsPage() {
-  const { me, profiles, settings, tally, isHost, loadedTally } = useSession();
+  const { me, profiles, claims, settings, voters, isHost, canManageTeam } = useSession();
 
   if (!me) return null;
 
@@ -22,15 +22,17 @@ export function ResultsPage() {
 
       <WinnerBlock settings={settings} profiles={profiles} />
 
-      {/* The per-person breakdown is the host's commentary sheet — who's leading, by
-          how much, whether it's a tie. It's counts only; nothing here or anywhere
-          else can say who cast them. */}
-      {isHost && loadedTally && <Scoreboard profiles={profiles} tally={tally} total={total} />}
+      {/* Turnout only, never a per-candidate breakdown — how many of the claimed
+          names voted, not who they voted for or how the count split between
+          candidates. */}
+      {isHost && (
+        <VotingProgress voters={voters} weekKey={settings.currentWeek} eligibleCount={Object.keys(claims).length - 1} />
+      )}
 
       {isHost && (
         <p className="mb-5 text-xs text-text-muted">Voting reopens automatically on Friday, when the new week starts.</p>
       )}
-      <Suspense fallback={null}>{isHost && <LazyManageTeamPanel />}</Suspense>
+      <Suspense fallback={null}>{canManageTeam && <LazyManageTeamPanel />}</Suspense>
     </>
   );
 }

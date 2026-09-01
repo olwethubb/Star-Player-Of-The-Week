@@ -93,3 +93,17 @@ export function isHostName(name: string | null | undefined): boolean {
 export function isHostProfile(profile: Profile | null | undefined): boolean {
   return isHostName(profile?.name);
 }
+
+/** Whoever's signed in as this name can manage the roster (add, rename, remove
+ * teammates) year-round, regardless of who's claimed KG that week — the person
+ * actually running this deployment, not a rotating hosting duty. Matched on name for
+ * the same reason KG is: no accounts, no roles, just a name someone claims. */
+export const ADMIN_NAME = 'OB';
+
+export function isAdminName(name: string | null | undefined): boolean {
+  return !!name && name.trim().toLowerCase() === ADMIN_NAME.toLowerCase();
+}
+
+export function isAdminProfile(profile: Profile | null | undefined): boolean {
+  return isAdminName(profile?.name);
+}

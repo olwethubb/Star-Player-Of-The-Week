@@ -60,6 +60,16 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/sotw_stat_status/$(uid)).data.status == 'up'
         && get(/databases/$(database)/documents/sotw_stat_status/$(uid)).data.weekKey == currentWeekKey();
     }
+    // A roster name nobody has actually claimed yet is not a real candidate — a
+    // declaration can outlive the claim it came from (releasing a name doesn't
+    // clear it), and without this check a vote could still land on someone who
+    // isn't actively "in" any more.
+    function isClaimed(uid) {
+      return exists(/databases/$(database)/documents/sotw_claims/$(uid));
+    }
+    function isEligibleCandidate(uid) {
+      return isClaimed(uid) && isUpThisWeek(uid);
+    }
 
     // The roster. Shape-checked so a stray write can't corrupt it, but not access-
     // controlled — see the file header. The app's own UI only exposes add/rename/
@@ -107,7 +117,10 @@ service cloud.firestore {
 
     // Anonymous running counts, one doc per candidate. Nudged by exactly the +1/-1
     // that casting or changing a single vote produces — never an arbitrary value, and
-    // never for someone who isn't on the roster or isn't 'up' this week.
+    // never for someone who isn't currently claimed and 'up' this week. A name
+    // nobody holds any more (released, or never claimed at all) can't accrue a vote,
+    // even if a stale 'up' declaration is still sitting there from before it was
+    // released — see isClaimed/isEligibleCandidate above.
     //
     // Readable ONLY once voting has closed. That's not about who's asking (nothing
     // here can tell), it's about ordering: watching the live count move while voting
@@ -118,7 +131,7 @@ service cloud.firestore {
     match /sotw_tally/{uid} {
       allow read: if !votingIsOpen();
       allow create: if votingIsOpen()
-                    && isUpThisWeek(uid)
+                    && isEligibleCandidate(uid)
                     && (currentRunoffUids() == null || uid in currentRunoffUids())
                     && request.resource.data.keys().hasOnly(['count'])
                     && request.resource.data.count == 1;
@@ -129,10 +142,10 @@ service cloud.firestore {
                     && (
                       // Up requires eligibility, same as a first vote. Down doesn't:
                       // that's someone correcting away from an earlier pick, and a
-                      // candidate who switches to 'down' mid-week must not leave an
-                      // already-cast vote stuck with no way to be taken back off.
+                      // candidate who switches to 'down' (or gets un-claimed) mid-week
+                      // must not leave an already-cast vote stuck with no way back off.
                       (request.resource.data.count - resource.data.count == 1
-                        && isUpThisWeek(uid)
+                        && isEligibleCandidate(uid)
                         && (currentRunoffUids() == null || uid in currentRunoffUids()))
                       || (request.resource.data.count - resource.data.count == -1)
                     );

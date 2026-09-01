@@ -250,8 +250,9 @@ describe('sotw_tally — counts only, closed to reading while voting is open', (
     await assertSucceeds(getDoc(doc(client(), 'sotw_tally', 'ob')));
   });
 
-  it('lets a first vote create a count of exactly 1 for someone up this week', async () => {
+  it('lets a first vote create a count of exactly 1 for someone claimed and up this week', async () => {
     await seedProfile('ob', 'OB');
+    await seedClaim('ob');
     await seedStatUp('ob');
     await seedSettingsThisWeek({ votingOpen: true });
     await assertSucceeds(setDoc(doc(client(), 'sotw_tally', 'ob'), { count: 1 }));
@@ -259,6 +260,7 @@ describe('sotw_tally — counts only, closed to reading while voting is open', (
 
   it('rejects creating a count other than 1', async () => {
     await seedProfile('ob', 'OB');
+    await seedClaim('ob');
     await seedStatUp('ob');
     await seedSettingsThisWeek({ votingOpen: true });
     await assertFails(setDoc(doc(client(), 'sotw_tally', 'ob'), { count: 5 }));
@@ -266,29 +268,68 @@ describe('sotw_tally — counts only, closed to reading while voting is open', (
 
   it('rejects a first vote for someone who has not declared stats up this week', async () => {
     await seedProfile('ob', 'OB');
+    await seedClaim('ob');
+    await seedSettingsThisWeek({ votingOpen: true });
+    await assertFails(setDoc(doc(client(), 'sotw_tally', 'ob'), { count: 1 }));
+  });
+
+  it('rejects a first vote for someone up this week whose name nobody has ever claimed', async () => {
+    // The scenario this exists for: a stats-up declaration can only ever be written
+    // by whoever holds the claim at the time (StatStatusGate only renders for
+    // myUid), but nothing deletes that declaration if the claim is later released —
+    // so a name can end up 'up' with no claim behind it at all.
+    await seedProfile('ob', 'OB');
+    await seedStatUp('ob');
+    await seedSettingsThisWeek({ votingOpen: true });
+    await assertFails(setDoc(doc(client(), 'sotw_tally', 'ob'), { count: 1 }));
+  });
+
+  it('rejects a first vote for someone up this week whose claim was since released', async () => {
+    await seedProfile('ob', 'OB');
+    await seedClaim('ob');
+    await seedStatUp('ob');
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await deleteDoc(doc(context.firestore(), 'sotw_claims', 'ob'));
+    });
     await seedSettingsThisWeek({ votingOpen: true });
     await assertFails(setDoc(doc(client(), 'sotw_tally', 'ob'), { count: 1 }));
   });
 
   it('rejects nudging a count up by more than one', async () => {
     await seedProfile('ob', 'OB');
+    await seedClaim('ob');
     await seedStatUp('ob');
     await seedSettingsThisWeek({ votingOpen: true });
     await seedTally('ob', 3);
     await assertFails(updateDoc(doc(client(), 'sotw_tally', 'ob'), { count: 99 }));
   });
 
-  it('lets a count go up by exactly one for someone still up this week', async () => {
+  it('lets a count go up by exactly one for someone still claimed and up this week', async () => {
     await seedProfile('ob', 'OB');
+    await seedClaim('ob');
     await seedStatUp('ob');
     await seedSettingsThisWeek({ votingOpen: true });
     await seedTally('ob', 3);
     await assertSucceeds(updateDoc(doc(client(), 'sotw_tally', 'ob'), { count: 4 }));
   });
 
+  it('rejects a count going up for someone whose claim was released, even if still marked up', async () => {
+    await seedProfile('ob', 'OB');
+    await seedClaim('ob');
+    await seedStatUp('ob');
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await deleteDoc(doc(context.firestore(), 'sotw_claims', 'ob'));
+    });
+    await seedSettingsThisWeek({ votingOpen: true });
+    await seedTally('ob', 3);
+    await assertFails(updateDoc(doc(client(), 'sotw_tally', 'ob'), { count: 4 }));
+  });
+
   it('lets a count go down by one even for someone no longer up — a switch to down must not strand a vote', async () => {
     await seedProfile('ob', 'OB');
-    // Deliberately no seedStatUp — they switched to 'down' mid-week.
+    // Deliberately no seedStatUp or seedClaim — the down direction never checks
+    // eligibility, on purpose: it's always just a correction away from an earlier
+    // pick, regardless of what the candidate's status is by the time it lands.
     await seedSettingsThisWeek({ votingOpen: true });
     await seedTally('ob', 3);
     await assertSucceeds(updateDoc(doc(client(), 'sotw_tally', 'ob'), { count: 2 }));
@@ -296,6 +337,7 @@ describe('sotw_tally — counts only, closed to reading while voting is open', (
 
   it('rejects any write once voting is closed', async () => {
     await seedProfile('ob', 'OB');
+    await seedClaim('ob');
     await seedStatUp('ob');
     await seedSettingsThisWeek({ votingOpen: false });
     await assertFails(setDoc(doc(client(), 'sotw_tally', 'ob'), { count: 1 }));
@@ -303,6 +345,7 @@ describe('sotw_tally — counts only, closed to reading while voting is open', (
 
   it('during a runoff, rejects a first vote for someone not in the tied set', async () => {
     await seedProfile('ob', 'OB');
+    await seedClaim('ob');
     await seedStatUp('ob');
     await seedSettingsThisWeek({ votingOpen: true, runoffUids: ['someone-else'] });
     await assertFails(setDoc(doc(client(), 'sotw_tally', 'ob'), { count: 1 }));
@@ -310,6 +353,7 @@ describe('sotw_tally — counts only, closed to reading while voting is open', (
 
   it('during a runoff, lets a first vote count for someone who IS tied', async () => {
     await seedProfile('ob', 'OB');
+    await seedClaim('ob');
     await seedStatUp('ob');
     await seedSettingsThisWeek({ votingOpen: true, runoffUids: ['ob'] });
     await assertSucceeds(setDoc(doc(client(), 'sotw_tally', 'ob'), { count: 1 }));

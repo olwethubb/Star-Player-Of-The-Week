@@ -9,7 +9,7 @@ import { VotingProgress } from './VotingProgress';
 import { useSession } from '@/hooks/useSession';
 
 export function MainScreen() {
-  const { myUid, me, profiles, claims, settings, voters, statStatuses, myPick, isHost } = useSession();
+  const { myUid, me, profiles, claims, settings, voters, statStatuses, myPick, isHost, canManageTeam } = useSession();
 
   const votingOpen = !!settings.votingOpen;
   const { castVote, pendingUid } = useCastVote();
@@ -17,12 +17,16 @@ export function MainScreen() {
   if (!myUid || !me) return null;
 
   const runoffUids = settings.runoffUids;
-  const isUpThisWeek = (uid: string) => {
+  // Claimed AND up this week — a name nobody holds isn't a real candidate, even if
+  // an 'up' declaration is still sitting there from before it was released. Matches
+  // firestore.rules' isEligibleCandidate, which is what actually enforces this on
+  // the tally itself; this is what keeps the UI in step with it.
+  const isEligibleCandidate = (uid: string) => {
     const decl = statStatuses[uid];
-    return !!decl && decl.weekKey === settings.currentWeek && decl.status === 'up';
+    return !!claims[uid] && !!decl && decl.weekKey === settings.currentWeek && decl.status === 'up';
   };
   const others = Object.entries(profiles).filter(
-    ([uid]) => uid !== myUid && isUpThisWeek(uid) && (!runoffUids || runoffUids.includes(uid)),
+    ([uid]) => uid !== myUid && isEligibleCandidate(uid) && (!runoffUids || runoffUids.includes(uid)),
   );
   const myDeclaredStatus = statStatuses[myUid]?.weekKey === settings.currentWeek ? statStatuses[myUid]!.status : null;
   // Voting is open and they haven't declared their status yet this week — the grid
@@ -69,7 +73,7 @@ export function MainScreen() {
       )}
 
       {isHost && <SessionControls votingOpen={votingOpen} revealing={!!settings.revealing} />}
-      <Suspense fallback={null}>{isHost && <LazyManageTeamPanel />}</Suspense>
+      <Suspense fallback={null}>{canManageTeam && <LazyManageTeamPanel />}</Suspense>
     </>
   );
 }

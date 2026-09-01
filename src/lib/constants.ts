@@ -1,4 +1,8 @@
-export const REVEAL_SPIN_MS = 5000; // how long the wheel spins for once a reveal starts
+// How long the wheel spins for once a reveal starts, until it lands on the winner.
+// Timed for KG to say the announcement line ("And the star player of this week is
+// none other than...") over the spin, landing right as they finish — 7s at a
+// deliberately slow, dramatic pace.
+export const REVEAL_SPIN_MS = 7000;
 // Under prefers-reduced-motion, the wheel settles directly on the winner with a short
 // crossfade instead of a full spin — this is that crossfade's duration, used both for
 // the wheel's own CSS transition and for scheduling when the "landed" phase begins.

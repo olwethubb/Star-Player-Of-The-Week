@@ -1,7 +1,7 @@
 import { onSnapshot } from 'firebase/firestore';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { claimsCol, profilesCol, settingsRef, statStatusCol, tallyCol, votersCol } from '@/lib/firebase';
-import { DEFAULT_SETTINGS, isHostProfile } from '@/types/firestore';
+import { claimsCol, profilesCol, settingsRef, statStatusCol, votersCol } from '@/lib/firebase';
+import { DEFAULT_SETTINGS, isAdminProfile, isHostProfile } from '@/types/firestore';
 import type { Claim, Profile, Settings, StatDeclaration, Voter } from '@/types/firestore';
 import { getWeekKey } from '@/lib/week';
 import { RUNOFF_ANNOUNCE_MS } from '@/lib/constants';
@@ -43,9 +43,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const [statStatuses, setStatStatuses] = useState<Record<string, StatDeclaration>>({});
   const [loadedStatStatuses, setLoadedStatStatuses] = useState(false);
-
-  const [tally, setTally] = useState<Record<string, number>>({});
-  const [loadedTally, setLoadedTally] = useState(false);
 
   const [loadErrorMsg, setLoadErrorMsg] = useState<string | null>(null);
   const onErr = handleErr(setLoadErrorMsg);
@@ -141,6 +138,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const me = myUid ? profiles[myUid] ?? null : null;
   const isHost = isHostProfile(me);
+  const canManageTeam = isHost || isAdminProfile(me);
 
   // Mirrors this browser's stored pick into React state so the vote grid re-renders
   // the moment it changes. localStorage is the source of truth (the server has no
@@ -152,64 +150,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setMyPick(getLocalPick(settings.currentWeek));
   }, [settings.currentWeek, myUid]);
-
-  // Only while this browser believes it's the host, and only once voting has closed —
-  // firestore.rules also refuses the read while voting is open (nobody can watch the
-  // live count move and infer who just voted), so this stays in step with what the
-  // database would actually hand back either way.
-  //
-  // The retry below exists because of a real race, not a hypothetical one: this
-  // effect fires the instant `settings.votingOpen` flips to false in React state,
-  // but that state comes from the settingsRef LISTENER, which echoes a local write
-  // (End Voting) the moment it's applied to the local cache — a beat before the
-  // server has actually committed it. The rules evaluate against server state, so
-  // the very first subscribe attempt here can land while the server still thinks
-  // voting is open and get denied — and unlike a transient network blip, Firestore's
-  // SDK does not retry a permission-denied listener on its own; it just stops. A
-  // short bounded retry rides out that exact gap instead of leaving the host's
-  // tally — and the whole results page's Scoreboard — stuck empty forever.
-  useEffect(() => {
-    if (!loadedSettings || !loadedClaims) return;
-    if (!isHost || settings.votingOpen) {
-      setTally({});
-      setLoadedTally(false);
-      return;
-    }
-    setLoadedTally(false);
-
-    let cancelled = false;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    let unsub: (() => void) | null = null;
-
-    const subscribe = (attempt: number) => {
-      unsub = onSnapshot(
-        tallyCol,
-        (snap) => {
-          const t: Record<string, number> = {};
-          snap.forEach((d) => (t[d.id] = d.data().count || 0));
-          setTally(t);
-          setLoadedTally(true);
-        },
-        (err) => {
-          const isPermissionRace =
-            attempt < 5 && err && typeof err === 'object' && 'code' in err && err.code === 'permission-denied';
-          if (!cancelled && isPermissionRace) {
-            retryTimer = setTimeout(() => subscribe(attempt + 1), 400);
-            return;
-          }
-          onErr(err);
-        },
-      );
-    };
-    subscribe(0);
-
-    return () => {
-      cancelled = true;
-      if (retryTimer) clearTimeout(retryTimer);
-      if (unsub) unsub();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadedSettings, loadedClaims, isHost, settings.votingOpen]);
 
   // Nobody clicks a button for this — the moment the voting week changes (Friday, per
   // getWeekKey's Thursday-to-Friday boundary), the host's client silently clears last
@@ -276,19 +216,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     settings,
     voters,
     statStatuses,
-    tally,
     loadedProfiles,
     loadedClaims,
     loadedSettings,
     loadedVoters,
     loadedStatStatuses,
-    loadedTally,
     loadErrorMsg,
     myUid,
     me,
     myPick,
     setMyPick,
     isHost,
+    canManageTeam,
     claimName,
     releaseName,
   };

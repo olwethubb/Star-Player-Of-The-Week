@@ -12,16 +12,12 @@ export interface SessionState {
    * for whom — see types/firestore.ts Voter. */
   voters: Record<string, Voter>;
   statStatuses: Record<string, StatDeclaration>;
-  /** Per-candidate counts. Populated only while this browser is the host and voting
-   * is closed — see SessionProvider. Empty otherwise. */
-  tally: Record<string, number>;
 
   loadedProfiles: boolean;
   loadedClaims: boolean;
   loadedSettings: boolean;
   loadedVoters: boolean;
   loadedStatStatuses: boolean;
-  loadedTally: boolean;
   loadErrorMsg: string | null;
 
   /** The uid of the roster profile this browser has claimed, or null if none yet.
@@ -38,6 +34,11 @@ export interface SessionState {
    * don't vote, they open and close it, and they see the per-person counts. Nothing
    * stops a browser from lying about this — see lib/localIdentity.ts. */
   isHost: boolean;
+  /** True for the host, OR for whoever's claimed the name OB — the person running
+   * this deployment, who can manage the roster (Team panel) year-round independent
+   * of who's hosting a given week. Unlike isHost, this doesn't exclude them from
+   * voting — OB votes normally unless they're also, separately, the host. */
+  canManageTeam: boolean;
 
   /** Take a name. Rejects if someone else already holds it. */
   claimName: (profileUid: string) => Promise<void>;
