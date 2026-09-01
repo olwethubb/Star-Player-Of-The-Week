@@ -56,6 +56,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const rollingWeek = useRef(false);
   const startingRunoff = useRef(false);
+  // Shields a name we just claimed from the orphan-check effect below, for the one
+  // moment where it would otherwise misfire — see that effect's comment.
+  const justClaimedUid = useRef<string | null>(null);
 
   // The five collections every client watches, all subscribed immediately on mount —
   // there's no identity to wait on any more before reading. All are small and all are
@@ -113,12 +116,27 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // If this browser remembers a name but that claim has since been freed (the host
   // cleared it, or the teammate was removed), fall back to the picker instead of a
   // broken "voting as nobody" state.
+  //
+  // The justClaimedUid guard exists because of a real race, not a hypothetical one:
+  // claimName below sets myUid the instant its Firestore transaction is acknowledged,
+  // but a transaction's result doesn't carry the same "applied to the local cache
+  // immediately" guarantee a plain write gets — the claimsCol listener that updates
+  // `claims` is a separate round trip that can genuinely land a beat later. Without
+  // this guard, THIS effect would run in that gap, see `claims[myUid]` still missing,
+  // and immediately clear the identity we just successfully claimed — bouncing
+  // straight back to the picker having done nothing visible but remove the name from
+  // the list. The guard trusts our own just-completed write until the snapshot
+  // catches up and confirms it, then gets out of the way so a genuinely freed claim
+  // (the host clearing it, mid-session) still bounces us back as intended.
   useEffect(() => {
     if (!loadedClaims || !myUid) return;
-    if (!claims[myUid]) {
-      localIdentity.clear();
-      setMyUid(null);
+    if (claims[myUid]) {
+      if (justClaimedUid.current === myUid) justClaimedUid.current = null;
+      return;
     }
+    if (justClaimedUid.current === myUid) return;
+    localIdentity.clear();
+    setMyUid(null);
   }, [loadedClaims, claims, myUid]);
 
   const me = myUid ? profiles[myUid] ?? null : null;
@@ -203,6 +221,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     clearAllLocalPicks();
     setMyPick(null);
     await claimsService.claimName(profileUid);
+    // Set BEFORE setMyUid, so it's already in place when that state change runs the
+    // orphan-check effect above — see its comment for why this order matters.
+    justClaimedUid.current = profileUid;
     localIdentity.set(profileUid);
     setMyUid(profileUid);
   }, []);
@@ -212,6 +233,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     clearAllLocalPicks();
     setMyPick(null);
     await claimsService.releaseName(myUid);
+    if (justClaimedUid.current === myUid) justClaimedUid.current = null;
     localIdentity.clear();
     setMyUid(null);
   }, [myUid]);
