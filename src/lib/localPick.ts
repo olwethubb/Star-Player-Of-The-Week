@@ -10,7 +10,20 @@
 // voted for, so the "Voted" tick goes away. Your vote itself still counts — it's in
 // the tally — you just can't change it from a browser that no longer remembers it.
 
-const PICK_PREFIX = 'sotw_pick_';
+const PREFIX = 'sotw_pick_';
+
+/** Scoped to the week AND the round within it.
+ *
+ * The round half is load-bearing, not cosmetic. A runoff (and the host starting a
+ * fresh round) deletes every sotw_tally doc while leaving the week key alone. Keyed
+ * by week alone, a browser would keep pointing at a pick whose count no longer
+ * exists, and its next vote would try to decrement a deleted doc — which lands as a
+ * CREATE with count -1 and is rejected by firestore.rules, breaking voting entirely
+ * for anyone who had already voted. Folding the round in means the key changes at the
+ * exact moment the counts are wiped, so every browser starts the new round clean. */
+function pickKey(weekKey: string, round: number): string {
+  return `${PREFIX}${weekKey}#${round}`;
+}
 
 function safeGet(key: string): string | null {
   try {
@@ -22,49 +35,30 @@ function safeGet(key: string): string | null {
   }
 }
 
-function safeSet(key: string, value: string): void {
+export function getLocalPick(weekKey: string | null, round: number): string | null {
+  if (!weekKey) return null;
+  return safeGet(pickKey(weekKey, round));
+}
+
+/** Writes this round's pick and drops any other remembered pick, so a browser never
+ * accumulates one entry per round forever and can never read back a stale one. */
+export function setLocalPick(weekKey: string | null, round: number, votedForUid: string): void {
+  if (!weekKey) return;
+  clearAllLocalPicks();
   try {
-    localStorage.setItem(key, value);
+    localStorage.setItem(pickKey(weekKey, round), votedForUid);
   } catch {
     // Ignore — a vote that can't be remembered locally is still cast.
   }
 }
 
-function safeRemove(key: string): void {
-  try {
-    localStorage.removeItem(key);
-  } catch {
-    // Ignore.
-  }
-}
-
-/** Scoped per week so last week's pick never shows up as this week's, and so a
- * runoff (which clears everyone's vote server-side) starts visually clean too. */
-function pickKey(weekKey: string): string {
-  return `${PICK_PREFIX}${weekKey}`;
-}
-
-export function getLocalPick(weekKey: string | null): string | null {
-  if (!weekKey) return null;
-  return safeGet(pickKey(weekKey));
-}
-
-export function setLocalPick(weekKey: string | null, votedForUid: string): void {
-  if (!weekKey) return;
-  safeSet(pickKey(weekKey), votedForUid);
-}
-
-export function clearLocalPick(weekKey: string | null): void {
-  if (!weekKey) return;
-  safeRemove(pickKey(weekKey));
-}
-
-/** Drops every remembered pick, whatever week it was for — used when handing the
- * device to someone else, so the next person doesn't inherit your vote state. */
+/** Drops every remembered pick, whatever week or round it was for — used when handing
+ * the device to someone else, so the next person doesn't inherit your vote state. */
 export function clearAllLocalPicks(): void {
   try {
-    const stale = Object.keys(localStorage).filter((k) => k.startsWith(PICK_PREFIX));
-    stale.forEach((k) => localStorage.removeItem(k));
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith(PREFIX))
+      .forEach((k) => localStorage.removeItem(k));
   } catch {
     // Ignore.
   }

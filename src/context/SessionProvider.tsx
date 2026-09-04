@@ -145,11 +145,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // copy — that's the point), but reading it during render wouldn't re-run when it's
   // written, leaving the "Voted" tick on the wrong card until something else nudged a
   // render. Re-reads whenever the week changes, so a rollover or runoff starts clean.
-  const [myPick, setMyPick] = useState<string | null>(() => getLocalPick(settings.currentWeek));
+  // Re-reads on `round` as well as the week: a runoff or a fresh round wipes the tally
+  // without changing the week key, and bumps round instead — that's the signal this
+  // browser's remembered pick no longer refers to anything. See lib/localPick.ts.
+  const [myPick, setMyPick] = useState<string | null>(() =>
+    getLocalPick(settings.currentWeek, settings.round ?? 0),
+  );
 
   useEffect(() => {
-    setMyPick(getLocalPick(settings.currentWeek));
-  }, [settings.currentWeek, myUid]);
+    setMyPick(getLocalPick(settings.currentWeek, settings.round ?? 0));
+  }, [settings.currentWeek, settings.round, myUid]);
 
   // Nobody clicks a button for this — the moment the voting week changes (Friday, per
   // getWeekKey's Thursday-to-Friday boundary), the host's client silently clears last

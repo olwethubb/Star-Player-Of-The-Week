@@ -39,12 +39,23 @@ export interface Settings {
   revealing: boolean;
   winnerUids: string[];
   totalVotes: number;
-  /** Non-null while a runoff round is the active vote: everyone (except the host)
-   * can still vote, but only for one of these uids — the ones who tied last round.
-   * Null outside of a runoff, including during a normal week's voting. */
+  /** Non-null while a runoff round is the active vote: everyone can still vote, but
+   * only for one of these uids — the ones who tied last round. Null outside of a
+   * runoff, including during a normal week's voting. */
   runoffUids: string[] | null;
   votingOpen: boolean;
   currentWeek: string | null;
+  /** Bumped every time the tally is wiped WITHIN the same week — a runoff, or the host
+   * starting a fresh round after a reveal. Local vote picks are keyed by week AND
+   * round (see lib/localPick.ts), so bumping this is what invalidates every browser's
+   * remembered pick at the same instant the counts it referred to are deleted.
+   *
+   * Without it, a browser would still think it had voted for someone whose tally doc
+   * no longer exists, and its next vote would try to decrement a deleted count — a
+   * write firestore.rules rejects outright, silently breaking that person's ability
+   * to vote for the rest of the round. Resets to 0 on a real week rollover, where the
+   * changing week key already does the invalidating. */
+  round: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -55,6 +66,7 @@ export const DEFAULT_SETTINGS: Settings = {
   runoffUids: null,
   votingOpen: false,
   currentWeek: null,
+  round: 0,
 };
 
 export type StatLevel = 'up' | 'down';
@@ -79,11 +91,12 @@ export interface WeeklyActivity {
   received: boolean;
 }
 
-/** Whoever claims this name runs the session: they don't vote, they open and close
- * voting, and they're the only one who sees the per-person counts (so they can
- * commentate on who's leading, or call a tie). It's matched on the roster name
- * rather than a stored flag because that's the whole rule — "whoever picks KG
- * reveals" — and it keeps the roster free of admin plumbing. */
+/** Whoever claims this name runs the session: they open and close voting and trigger
+ * the reveal. They still vote and can still be voted for like anyone else — hosting
+ * is the extra controls, not a different kind of membership, and there's no
+ * per-candidate view for them to see either way. Matched on the roster name rather
+ * than a stored flag because that's the whole rule — "whoever picks KG reveals" —
+ * and it keeps the roster free of admin plumbing. */
 export const HOST_NAME = 'KG';
 
 export function isHostName(name: string | null | undefined): boolean {

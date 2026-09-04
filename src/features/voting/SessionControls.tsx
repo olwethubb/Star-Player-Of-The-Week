@@ -81,7 +81,7 @@ export function SessionControls({
           open={confirmingEnd}
           onOpenChange={setConfirmingEnd}
           title="End voting now?"
-          description="Nobody will be able to vote again until you start a new session. You'll then see the totals."
+          description="Nobody will be able to vote again until you start a new session. You can then reveal the winner."
           confirmLabel="End Voting"
           onConfirm={end}
         />

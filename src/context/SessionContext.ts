@@ -30,14 +30,15 @@ export interface SessionState {
   /** Called after a vote lands so the grid re-renders against the new pick.
    * lib/localPick.ts is what actually persists it; this just mirrors it into state. */
   setMyPick: (uid: string | null) => void;
-  /** True when this browser's claimed name is KG. The host runs the session: they
-   * don't vote, they open and close it, and they see the per-person counts. Nothing
-   * stops a browser from lying about this — see lib/localIdentity.ts. */
+  /** True when this browser's claimed name is KG. The host opens and closes voting,
+   * triggers the reveal, and sees turnout — but votes and can be voted for like
+   * everyone else. Nothing stops a browser from lying about this — see
+   * lib/localIdentity.ts. */
   isHost: boolean;
   /** True for the host, OR for whoever's claimed the name OB — the person running
    * this deployment, who can manage the roster (Team panel) year-round independent
-   * of who's hosting a given week. Unlike isHost, this doesn't exclude them from
-   * voting — OB votes normally unless they're also, separately, the host. */
+   * of who's hosting a given week. Purely additive: it grants the Team panel and
+   * changes nothing about voting. */
   canManageTeam: boolean;
 
   /** Take a name. Rejects if someone else already holds it. */

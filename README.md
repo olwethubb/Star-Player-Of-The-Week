@@ -58,11 +58,19 @@ stuck on the browser that claimed it — the host frees it from
 **Team → Free up name**, then you can take it again.
 
 **KG runs the session — same trade.** Whoever's browser has claimed the
-profile named `KG` sees the host controls: open/close voting, pause a week,
-run the reveal. The app's UI decides this purely by checking the locally
-remembered name, so the roster **needs a profile called KG** or nobody sees
-those controls at all — and, same as above, the database doesn't verify who's
-allowed to be the one who tapped it.
+profile named `KG` sees the host controls: open/close voting, run the reveal,
+and start a fresh round if one needs re-running before Friday. They vote and
+can be voted for like everyone else — hosting is those extra buttons, not a
+different kind of membership, and there is no per-candidate view for them to
+see either way (only turnout, then the winner). The app's UI decides this
+purely by checking the locally remembered name, so the roster **needs a
+profile called KG** or nobody sees those controls at all — and, same as above,
+the database doesn't verify who's allowed to be the one who claimed it.
+
+**OB manages the roster.** Whoever's claimed `OB` also gets the Team panel
+year-round, independent of who's hosting that week, so people can be added or
+removed without waiting on KG. Purely additive — it changes nothing about
+voting.
 
 ## Who voted for whom is never recorded
 

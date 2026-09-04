@@ -416,12 +416,12 @@ describe('sotw_weekly_activity — what is left after the tally is wiped', () =>
 
 // ---------------------------------------------------------------------------
 // 8. LIST QUERIES — every test above reads with getDoc (single document). The
-// app itself never does that for sotw_tally: doReveal and the host's live
-// subscription both run a `list` query (getDocs/onSnapshot) over the whole
-// collection. Firestore evaluates `list` and `get` separately, so a rule that
-// passes every getDoc-based test above can still behave differently — or
-// outright error — under `list`. This section exists specifically to close
-// that gap after it let a real bug through uncaught.
+// app itself never does that for sotw_tally: doReveal, startRunoff, startNewRound
+// and rollWeek all run a `list` query (getDocs) over the whole collection.
+// Firestore evaluates `list` and `get` separately, so a rule that passes every
+// getDoc-based test above can still behave differently — or outright error —
+// under `list`. This section exists specifically to close that gap after it let
+// a real bug through uncaught.
 // ---------------------------------------------------------------------------
 
 describe('sotw_tally — the actual list query the app runs, not just getDoc', () => {

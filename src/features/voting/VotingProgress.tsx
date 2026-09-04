@@ -6,7 +6,10 @@ import type { Voter } from '@/types/firestore';
  * This counts voter markers, which record only THAT someone voted. There is nothing
  * to break down by candidate here even in principle: the per-candidate counts live
  * in a separate collection the rules won't open until voting closes, and who-voted-
- * for-whom is never stored at all. */
+ * for-whom is never stored at all.
+ *
+ * `eligibleCount` is every claimed name INCLUDING the host, who votes too — not
+ * claims-minus-one as it once was, back when hosting meant sitting the vote out. */
 export function VotingProgress({
   voters,
   weekKey,

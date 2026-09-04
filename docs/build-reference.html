@@ -176,9 +176,16 @@
     <p style="font-size:13.5px;">
       One name on the roster is still different: whoever's browser has claimed
       <strong style="color:var(--ink)">KG</strong> sees the controls to run the session — opens and
-      closes voting, pauses a week, calls the reveal. They don't vote themselves. There's no role to
-      assign and no account to promote; the app's own screen decides this purely by checking which name
-      you've locally claimed, the same as everything else about "who you are" here.
+      closes voting, calls the reveal, and can start a fresh round if one needs re-running. They vote
+      and can be voted for like everyone else; hosting is those extra buttons, not a different kind of
+      membership. There's no role to assign and no account to promote; the app's own screen decides this
+      purely by checking which name you've locally claimed, the same as everything else about "who you
+      are" here.
+    </p>
+    <p style="font-size:13.5px;">
+      A second name gets one narrow extra: whoever's claimed <strong style="color:var(--ink)">OB</strong>
+      also sees the Team panel, so the roster can be edited year-round without waiting on whoever is
+      hosting that week. That is purely additive — it changes nothing about voting.
     </p>
   </section>
 
@@ -206,7 +213,7 @@
     <h2 class="section-head"><span class="num">04</span> What's protected</h2>
     <div class="guarantee-list">
       <div class="guarantee"><span class="check">✓</span><p><strong>Nobody can learn who voted for whom.</strong> It is never recorded — not for teammates, not for KG, not for anyone reading the raw database. Two things get stored: that a person voted, and a running count for each candidate, and neither field can be stretched to carry the other (the rules reject any extra field on either doc). This is a real guarantee, not a convention — it holds regardless of who's asking, because nobody is ever checked.</p></div>
-      <div class="guarantee"><span class="check">✓</span><p><strong>The count is unreadable while voting is open.</strong> Whether it's KG, a teammate, or someone poking the database directly, the read is refused until voting closes — so nobody can watch a number tick up and work out who just voted. Once it closes, anyone can technically read it; the app's own screen still only shows it to whoever's claimed KG.</p></div>
+      <div class="guarantee"><span class="check">✓</span><p><strong>The count is unreadable while voting is open.</strong> Whether it's KG, a teammate, or someone poking the database directly, the read is refused until voting closes — so nobody can watch a number tick up and work out who just voted. Once it closes, anyone can technically read it — but the app itself has no per-candidate view at all any more, for KG or anyone: the only thing shown is turnout, and then the winner.</p></div>
     </div>
     <p style="font-size:13px;margin-top:12px;">
       What's <em>not</em> a database-level guarantee any more, now that this app dropped every form of

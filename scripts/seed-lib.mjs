@@ -89,4 +89,5 @@ export const DEMO_SETTINGS = {
   totalVotes: 0,
   votingOpen: true,
   currentWeek: DEMO_WEEK,
+  round: 0,
 };

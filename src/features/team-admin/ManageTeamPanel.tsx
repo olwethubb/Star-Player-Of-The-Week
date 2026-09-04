@@ -48,7 +48,7 @@ export function ManageTeamPanel() {
       {!hasHost && (
         <p className="mb-3.5 rounded-xl border border-accent/40 bg-accent/5 px-3.5 py-2.5 text-[13px] leading-relaxed">
           Nobody on the roster is called <b>{HOST_NAME}</b>. Whoever claims that name runs the session — opens and
-          closes voting, and sees the totals. Add or rename someone to {HOST_NAME} to hand over these controls.
+          closes voting, and runs the reveal. Add or rename someone to {HOST_NAME} to hand over these controls.
         </p>
       )}
       {rows.length === 0 ? (

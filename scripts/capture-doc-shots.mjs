@@ -26,9 +26,13 @@ for (const name of [HOST, ME, ...TEAM]) {
   const uid = fakeUid(name);
   uids[name] = uid;
   await setDoc(`sotw_profiles/${uid}`, { name });
-  if (name !== HOST) {
-    await setDoc(`sotw_stat_status/${uid}`, { weekKey: DEMO_WEEK, status: 'up' });
+  // A candidate must be claimed AND marked up (isEligibleCandidate in
+  // firestore.rules), so the shot of the vote grid needs claims seeded too. ME and
+  // HOST stay unclaimed — this script joins as each of them in turn below.
+  if (name !== ME && name !== HOST) {
+    await setDoc(`sotw_claims/${uid}`, { claimedAt: null });
   }
+  await setDoc(`sotw_stat_status/${uid}`, { weekKey: DEMO_WEEK, status: 'up' });
 }
 await setDoc('sotw_meta/settings', DEMO_SETTINGS);
 console.log('seeded demo team');

@@ -12,6 +12,10 @@ interface VoteGridProps {
    * empty roster needs more people added, a populated one just needs them to open
    * the app and declare their status for the week. */
   teammateCount: number;
+  /** The host reaches the closed-voting state too, now that they vote like everyone
+   * else — and telling them to "check back once KG opens it" would be telling them to
+   * wait on themselves, with the button that does it sitting right below. */
+  isHost: boolean;
   /** Read from this browser's own storage, not the server — nothing server-side
    * records who you picked. See lib/localPick.ts. */
   myPick: string | null;
@@ -19,11 +23,17 @@ interface VoteGridProps {
   onVote: (uid: string) => void;
 }
 
-export function VoteGrid({ votingOpen, others, teammateCount, myPick, pendingUid, onVote }: VoteGridProps) {
+export function VoteGrid({ votingOpen, others, teammateCount, isHost, myPick, pendingUid, onVote }: VoteGridProps) {
   const streaks = useStreaks();
 
   if (!votingOpen) {
-    return <EmptyState icon={<IconLock />}>Voting hasn't opened yet this week. Check back once KG opens it.</EmptyState>;
+    return (
+      <EmptyState icon={<IconLock />}>
+        {isHost
+          ? "Voting is closed. Start it below when you're ready — you vote in it too."
+          : "Voting hasn't opened yet this week. Check back once KG opens it."}
+      </EmptyState>
+    );
   }
   if (others.length === 0) {
     return (
@@ -75,7 +85,7 @@ export function VoteGrid({ votingOpen, others, teammateCount, myPick, pendingUid
         <IconLock className="mt-0.5 text-text-muted" />
         <span>
           {myPick ? 'Your vote is in — tap another name to change it.' : "You haven't voted yet."} Who you picked is
-          never sent anywhere: KG sees the totals once voting closes, never the names behind them.
+          never sent anywhere — not to KG, not to anyone.
         </span>
       </div>
     </>

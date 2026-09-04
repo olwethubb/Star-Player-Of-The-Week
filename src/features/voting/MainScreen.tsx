@@ -43,18 +43,16 @@ export function MainScreen() {
         Vote for the teammate who went above and beyond this week.
       </p>
 
-      {votingOpen && !isHost && <StatStatusGate uid={myUid} current={myDeclaredStatus} />}
+      {votingOpen && <StatStatusGate uid={myUid} current={myDeclaredStatus} />}
 
-      {isHost ? (
-        <>
-          <p className="mb-5 rounded-xl border border-border-soft bg-bg-elevated px-4 py-3 text-[13px] text-text-muted">
-            You're running this week's session, so you don't cast a vote.
-          </p>
-          {votingOpen && (
-            <VotingProgress voters={voters} weekKey={settings.currentWeek} eligibleCount={Object.keys(claims).length - 1} />
-          )}
-        </>
-      ) : awaitingMyStatus ? null : (
+      {/* The host votes and can be voted for like everyone else — running the session
+          is just the extra controls below. They only ever see turnout, never a
+          per-candidate breakdown, so taking part carries no information advantage. */}
+      {isHost && votingOpen && (
+        <VotingProgress voters={voters} weekKey={settings.currentWeek} eligibleCount={Object.keys(claims).length} />
+      )}
+
+      {awaitingMyStatus ? null : (
         <>
           {runoffUids && (
             <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.1em] text-accent">
@@ -65,6 +63,7 @@ export function MainScreen() {
             votingOpen={votingOpen}
             others={others}
             teammateCount={Object.keys(profiles).length - 1}
+            isHost={isHost}
             myPick={myPick}
             pendingUid={pendingUid}
             onVote={castVote}

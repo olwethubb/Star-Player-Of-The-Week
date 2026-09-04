@@ -16,7 +16,14 @@ export function useCastVote() {
       try {
         // The previous pick has to be handed in from here rather than read back from
         // the server — the server has never known it. See services/voting.service.ts.
-        await votingService.castVote(myUid, forUid, myPick, settings.currentWeek, !!settings.votingOpen);
+        await votingService.castVote(
+          myUid,
+          forUid,
+          myPick,
+          settings.currentWeek,
+          settings.round ?? 0,
+          !!settings.votingOpen,
+        );
         setMyPick(forUid);
       } catch (err) {
         notify(friendlyError(err, 'Could not cast your vote. Try again in a moment.'));
@@ -24,7 +31,7 @@ export function useCastVote() {
         setPendingUid(null);
       }
     },
-    [myUid, myPick, setMyPick, settings.currentWeek, settings.votingOpen, notify],
+    [myUid, myPick, setMyPick, settings.currentWeek, settings.round, settings.votingOpen, notify],
   );
 
   return { castVote, pendingUid };
@@ -77,6 +84,27 @@ export function useDoReveal() {
   }, [profiles, notify]);
 
   return { reveal, pending };
+}
+
+export function useStartNewRound() {
+  const { notify } = useToast();
+  const [pending, setPending] = useState(false);
+
+  const startNewRound = useCallback(async () => {
+    setPending(true);
+    try {
+      const done = await votingService.startNewRound();
+      if (!done) {
+        notify('Nothing happened — a reveal is in progress. Try again in a moment.');
+      }
+    } catch (err) {
+      notify(friendlyError(err, 'Could not start a new vote. Try again in a moment.'));
+    } finally {
+      setPending(false);
+    }
+  }, [notify]);
+
+  return { startNewRound, pending };
 }
 
 export function useForceUnlockReveal() {
