@@ -1,14 +1,11 @@
-@import '@fontsource/inter/400.css';
-@import '@fontsource/inter/500.css';
-@import '@fontsource/inter/600.css';
-@import '@fontsource/inter/700.css';
-@import '@fontsource/space-grotesk/500.css';
-@import '@fontsource/space-grotesk/600.css';
-@import '@fontsource/space-grotesk/700.css';
-@import '@fontsource/jetbrains-mono/500.css';
-@import '@fontsource/jetbrains-mono/700.css';
-@import '@fontsource/fraunces/600-italic.css';
-@import '@fontsource/fraunces/700-italic.css';
+/* One typeface for the whole app, self-hosted like blacfox.com's own Montserrat —
+   see tailwind.config.ts, where every font-family alias resolves here. */
+@import '@fontsource/montserrat/400.css';
+@import '@fontsource/montserrat/500.css';
+@import '@fontsource/montserrat/600.css';
+@import '@fontsource/montserrat/700.css';
+@import '@fontsource/montserrat/800.css';
+@import '@fontsource/montserrat/800-italic.css';
 
 @import './tokens.css';
 
@@ -30,7 +27,7 @@
   body {
     background: var(--bg);
     color: var(--text);
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Montserrat', system-ui, sans-serif;
     min-height: 100vh;
     -webkit-font-smoothing: antialiased;
   }
@@ -137,10 +134,43 @@
   animation-fill-mode: forwards;
 }
 
-/* Full-page backdrop for the gate/auth screens: a soft warm glow behind a single
-   centered glass card. */
+/* A tie's "the wheel breaks" moment — see Wheel.tsx. Two copies of the landed wheel,
+   each clipped to one side of the same jagged crack line (the two polygons share
+   every crack vertex, so they fit together seamlessly until they split), crack apart
+   and fall away to reveal every tied name at once. The short delay lets the wheel
+   visibly come to rest first, so it reads as "landed, then broke" rather than one
+   blurred motion. Not motion-exempt: under prefers-reduced-motion the blanket rule
+   collapses this to an instant disappearance, which is fine for a flourish. */
+.wheel-break-half {
+  position: absolute;
+  inset: 0;
+  transition:
+    transform 900ms cubic-bezier(0.3, 0.7, 0.4, 1) 150ms,
+    opacity 600ms ease-in 500ms;
+  will-change: transform, opacity;
+}
+.wheel-break-left {
+  clip-path: polygon(0 0, 52% 0, 46% 22%, 54% 40%, 45% 58%, 53% 78%, 48% 100%, 0 100%);
+}
+.wheel-break-right {
+  clip-path: polygon(52% 0, 100% 0, 100% 100%, 48% 100%, 53% 78%, 45% 58%, 54% 40%, 46% 22%);
+}
+.wheel-break-left.wheel-break-go {
+  transform: translate(-24%, 14%) rotate(-18deg);
+  opacity: 0;
+}
+.wheel-break-right.wheel-break-go {
+  transform: translate(24%, 14%) rotate(18deg);
+  opacity: 0;
+}
+
+/* Full-page backdrop for the gate/auth screen: near-black with a faint warm ember
+   glow, the same register as blacfox.com's own dark hero and header chrome — the one
+   place on their site that goes this dark, everything else is paper or white. */
 .gate-dark-bg {
-  background: radial-gradient(circle at 32% 22%, #3c2a1c 0%, #150f0a 55%, #0a0704 100%);
+  background:
+    radial-gradient(ellipse 900px 600px at 50% -8%, rgba(233, 92, 37, 0.16) 0%, transparent 60%),
+    #0a0a0a;
 }
 
 /* The action card reads as a pane of glass floating on that backdrop — blur and a
@@ -151,18 +181,18 @@
    source, because they consume --text/--border/etc. as CSS variables, which this
    scope quietly overrides to their on-dark equivalents. */
 .gate-glass-card {
-  background: rgba(255, 248, 240, 0.055);
+  background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
-  box-shadow: 0 40px 80px -24px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 40px 80px -24px rgba(0, 0, 0, 0.6);
   --text: var(--on-dark);
   --text-muted: var(--on-dark-muted);
   /* Alpha tuned so these clear the WCAG 1.4.11 3:1 non-text minimum against both
      the card background and the (lighter) input fill — the original 0.18/0.09
      read as decorative but measured under 2:1, leaving input/button boundaries
      essentially invisible at rest. */
-  --border: rgba(255, 248, 240, 0.4);
-  --border-soft: rgba(255, 248, 240, 0.24);
-  --bg-elevated: rgba(255, 248, 240, 0.07);
+  --border: rgba(255, 255, 255, 0.4);
+  --border-soft: rgba(255, 255, 255, 0.24);
+  --bg-elevated: rgba(255, 255, 255, 0.07);
   --bg-card: transparent;
 }

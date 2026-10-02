@@ -14,8 +14,8 @@ const PREFIX = 'sotw_pick_';
 
 /** Scoped to the week AND the round within it.
  *
- * The round half is load-bearing, not cosmetic. A runoff (and the host starting a
- * fresh round) deletes every sotw_tally doc while leaving the week key alone. Keyed
+ * The round half is load-bearing, not cosmetic. Resetting or restarting a round
+ * deletes every sotw_tally doc while leaving the week key alone. Keyed
  * by week alone, a browser would keep pointing at a pick whose count no longer
  * exists, and its next vote would try to decrement a deleted doc — which lands as a
  * CREATE with count -1 and is rejected by firestore.rules, breaking voting entirely

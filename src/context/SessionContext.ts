@@ -30,16 +30,16 @@ export interface SessionState {
   /** Called after a vote lands so the grid re-renders against the new pick.
    * lib/localPick.ts is what actually persists it; this just mirrors it into state. */
   setMyPick: (uid: string | null) => void;
-  /** True when this browser's claimed name is KG. The host opens and closes voting,
-   * triggers the reveal, and sees turnout — but votes and can be voted for like
-   * everyone else. Nothing stops a browser from lying about this — see
+  /** True when this browser has claimed one of the three names in REVEALER_NAMES —
+   * KG, Steph, or OB (types/firestore.ts). Shows the Reveal Winner button, grants the
+   * Team panel, and is exempt from the auto sign-out after a reveal. Unlike the
+   * single-host design this replaced, a revealer votes exactly like anyone else —
+   * this never gates candidacy or the ability to cast a vote, only the reveal action
+   * itself and roster management. (Separately, permanently, regardless of who's
+   * currently a revealer, KG specifically is never a CANDIDATE either, since KG's the
+   * CEO — see isHostProfile.) Nothing stops a browser from lying about this — see
    * lib/localIdentity.ts. */
-  isHost: boolean;
-  /** True for the host, OR for whoever's claimed the name OB — the person running
-   * this deployment, who can manage the roster (Team panel) year-round independent
-   * of who's hosting a given week. Purely additive: it grants the Team panel and
-   * changes nothing about voting. */
-  canManageTeam: boolean;
+  canReveal: boolean;
 
   /** Take a name. Rejects if someone else already holds it. */
   claimName: (profileUid: string) => Promise<void>;

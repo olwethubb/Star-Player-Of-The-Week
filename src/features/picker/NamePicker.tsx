@@ -8,8 +8,8 @@ import { useToast } from '@/hooks/useToast';
 import { friendlyError } from '@/lib/errors';
 import { getWeekLabel } from '@/lib/week';
 import { addTeammate } from '@/services/profiles.service';
-import { HOST_NAME, isHostName, type Profile } from '@/types/firestore';
-import { PickerBody, PickerEyebrow, PickerHeading, PickerShell } from './PickerShell';
+import { HOST_NAME, isPubliclyTaggedRevealer, type Profile } from '@/types/firestore';
+import { HeadingAccent, PickerBody, PickerEyebrow, PickerHeading, PickerShell } from './PickerShell';
 
 /** A brand-new project has no roster and no host — nobody can claim a name that
  * doesn't exist yet, and normally only the host can add one. firestore.rules opens a
@@ -92,9 +92,9 @@ function NameSelect({
               >
                 <Select.ItemText>{profile.name}</Select.ItemText>
                 <span className="flex items-center gap-2">
-                  {isHostName(profile.name) && (
-                    <span className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.06em] opacity-70">
-                      runs the reveal
+                  {isPubliclyTaggedRevealer(profile.name) && (
+                    <span aria-label="Runs the reveal" title="Runs the reveal" className="text-accent">
+                      ★
                     </span>
                   )}
                   <Select.ItemIndicator>
@@ -154,7 +154,9 @@ export function NamePicker() {
       brand={
         <>
           <PickerEyebrow>{getWeekLabel()}</PickerEyebrow>
-          <PickerHeading>Star Player of the Week</PickerHeading>
+          <PickerHeading>
+            Star Player <HeadingAccent>of the Week</HeadingAccent>
+          </PickerHeading>
           <PickerBody>Vote for the teammate who went above and beyond this week.</PickerBody>
         </>
       }

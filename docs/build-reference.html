@@ -174,18 +174,111 @@
       than identity is the vote count — see "What's protected" below.
     </p>
     <p style="font-size:13.5px;">
-      One name on the roster is still different: whoever's browser has claimed
-      <strong style="color:var(--ink)">KG</strong> sees the controls to run the session — opens and
-      closes voting, calls the reveal, and can start a fresh round if one needs re-running. They vote
-      and can be voted for like everyone else; hosting is those extra buttons, not a different kind of
-      membership. There's no role to assign and no account to promote; the app's own screen decides this
-      purely by checking which name you've locally claimed, the same as everything else about "who you
-      are" here.
+      Three names on the roster are still different: whoever's browser has claimed
+      <strong style="color:var(--ink)">KG</strong>, <strong style="color:var(--ink)">Steph</strong>, or
+      <strong style="color:var(--ink)">OB</strong> sees the session controls and the Team panel — see
+      <code>REVEALER_NAMES</code> and <code>isRevealerProfile</code> in <code>types/firestore.ts</code>.
+      Not a priority fallback: all three matter independently, and whichever of them happen to be claimed
+      at once can each act. Voting starts every week LOCKED — <code>rollWeek</code> leaves
+      <code>votingOpen: false</code> — and everyone signed in, revealer included, sees a "voting hasn't
+      started" screen (see <code>VoteGrid</code>'s own empty state) until one of the three calls
+      <code>startVoting</code>. From there, clicking Reveal Winner closes voting and works out the winner
+      in the same action (see <code>doReveal</code> in <code>voting.service.ts</code>), so it's on whoever
+      clicks it to have actually checked everyone's voted, by asking around the office. Unlike the single-host design
+      this replaced, a revealer votes exactly like anyone else — declares stats, appears in the grid, casts
+      a pick — this only ever gates the reveal action and the Team panel, never candidacy or the ability to
+      vote. Separately, and regardless of who can currently reveal, <strong style="color:var(--ink)">KG</strong>
+      specifically is never a candidate at all — never asked to declare stats, never on anyone's grid —
+      because KG is the CEO, not because of anything to do with revealing. There's no role to assign and no
+      account to promote; the app's own screen decides all of this purely by checking which names are
+      currently claimed, the same as everything else about "who you are" here. Whoever it applies to sees a
+      plain-language banner on their own screen saying so — see the <code>canReveal</code> block in
+      <code>MainScreen.tsx</code> — so a Steph or OB isn't left guessing why they have extra controls. The
+      name picker's own roster list only stars <strong style="color:var(--ink)">KG</strong> and
+      <strong style="color:var(--ink)">Steph</strong> — deliberately not OB, so nobody glancing at that
+      public list can tell OB can reveal too. Purely cosmetic: OB has the full power once claimed either
+      way, just without the public tag — see <code>PUBLIC_REVEALER_NAMES</code> and
+      <code>isPubliclyTaggedRevealer</code> in <code>types/firestore.ts</code>.
     </p>
     <p style="font-size:13.5px;">
-      A second name gets one narrow extra: whoever's claimed <strong style="color:var(--ink)">OB</strong>
-      also sees the Team panel, so the roster can be edited year-round without waiting on whoever is
-      hosting that week. That is purely additive — it changes nothing about voting.
+      <strong style="color:var(--ink)">Reset Voting needs neither a reveal nor a close.</strong> Next to
+      Reveal Winner, a revealer also has a <strong style="color:var(--ink)">Reset Voting</strong> button —
+      clears this round's votes and locks voting again, any time, with no requirement that anything be
+      revealed first. A fresh <code>startVoting</code> call is needed afterward, same as any other locked
+      start — see the confirm copy in <code>SessionControls.tsx</code>. It's the exact same underlying
+      action ("Start a new vote") the results page already offered for after a reveal — see
+      <code>startNewRound</code> in <code>voting.service.ts</code> — just made reachable mid-session too,
+      for correcting a round before anyone's committed to revealing it. Nothing in the app ever flips
+      <code>votingOpen</code> true except <code>startVoting</code> itself.
+    </p>
+    <p style="font-size:13.5px;">
+      <strong style="color:var(--ink)">Reveal Winner only appears once a vote's been cast.</strong> With zero
+      votes there's nothing to reveal, so the button simply isn't there — a short note sits in its place
+      until the first vote lands (see <code>hasVotes</code> in <code>SessionControls.tsx</code>).
+    </p>
+    <p style="font-size:13.5px;">
+      <strong style="color:var(--ink)">A tie is never broken — every tied name wins.</strong> There's no
+      runoff and no re-vote: <code>computeWinners</code> returns everyone tied for the top count, however
+      many that is, and they're all Star Players of the Week together. The reveal makes a moment of it —
+      the wheel spins exactly as normal, then cracks down a jagged line and breaks apart, and every tied
+      name pops in where it was (see <code>isTie</code>/<code>broken</code> in <code>Wheel.tsx</code>, the
+      <code>.wheel-break-*</code> classes in <code>globals.css</code>, and <code>REVEAL_TIE_BREAK_MS</code>).
+      Names are joined the way you'd say them — "A and B", "A, B and C" — via <code>joinNames</code> in
+      <code>lib/winners.ts</code>, so a 6-way tie reads as naturally as a 2-way one.
+    </p>
+    <p style="font-size:13.5px;">
+      <strong style="color:var(--ink)">A claim with nobody behind it frees itself after 15 minutes.</strong>
+      Claiming a name has no expiry on its own — closing a tab doesn't release it — so every open, claimed
+      browser quietly refreshes a <code>lastSeenAt</code> heartbeat on its own claim every 30s (see
+      <code>touchClaim</code> in <code>claims.service.ts</code>), and every open tab — not just a
+      revealer's — checks every 30s for any claim that's gone quiet longer than
+      <code>CLAIM_STALE_AFTER_MS</code> and deletes it (<code>releaseStaleClaims</code>). This is what keeps
+      the turnout count ("N people have voted so far") honest: without it, a name claimed once and then
+      abandoned would count as signed in forever. <code>firestore.rules</code> only allows one kind of
+      update to a claim — refreshing <code>lastSeenAt</code> alone — specifically so this can't become a way
+      to repoint whose name it is.
+    </p>
+    <p style="font-size:13.5px;">
+      <strong style="color:var(--ink)">Everyone but a revealer gets signed out after the reveal.</strong>
+      Once the result is on screen, anyone who isn't one of KG/Steph/OB is automatically signed out a few
+      seconds later — the same thing tapping Home does — and lands back on the name picker. A
+      revealer stays, since the session controls (start a new round, manage the roster) are theirs to use.
+      See <code>useAutoSignOutAfterReveal</code> in <code>ResultsPage.tsx</code>.
+    </p>
+    <p style="font-size:13.5px;">
+      <strong style="color:var(--ink)">Home — one vote per device.</strong> The signed-in screens' Home
+      button (which replaced "Not you?") signs the person out to the name picker. While voting's open it
+      first takes back the vote this device cast (<code>retractVote</code>: −1 on the one count it added,
+      plus deleting its own "I voted" marker), then frees the name and wipes its stats choice. Votes the
+      person <em>received</em> sit on their own count and are never touched. A shared phone therefore
+      can't stack votes; everyone votes on their own device.
+    </p>
+    <p style="font-size:13.5px;">
+      <strong style="color:var(--ink)">Switching to Stats Down takes your votes away.</strong> You drop off
+      the poll at once, and <code>doReveal</code> counts everyone's received votes except a Down person's
+      (<code>countableTally</code> in <code>lib/roundRules.ts</code>, which also never counts KG), so they end
+      on 0. Going Home or an expired sign-in never costs anyone the votes they'd received — and Home keeps a
+      Down choice in place, so leaving can't undo Down. Received votes aren't deleted mid-round, just not
+      counted, so no voter's device is ever left pointing at a count that's gone. Anyone who voted for a Down
+      person sees "doesn't count any more" (<code>stalePick</code> in <code>MainScreen.tsx</code>) and can vote
+      again, which takes their old −1 off as normal. If the person flips back to Up before the reveal,
+      untouched votes count again.
+    </p>
+    <p style="font-size:13.5px;">
+      <strong style="color:var(--ink)">Sign-in expiry can't sign out anyone who's really there.</strong> The
+      15-minute sweep (<code>findStaleClaimUids</code> in <code>lib/roundRules.ts</code>, unit-tested) never
+      sweeps anyone Up this round, so a locked phone doesn't drop a candidate off the poll. A heartbeat
+      still being written counts as fresh, and staleness is measured against the newest server heartbeat
+      as well as the device clock, so one device with a wrong clock can't sign everyone out. It frees only
+      the claim, never the stats choice. If the server already holds a vote from you this round but your
+      device has lost track of who for, you're told your vote is in instead of being allowed to vote twice
+      (<code>votedWithoutPick</code>). Turnout's "N" is everyone signed in plus everyone who already voted
+      (<code>roundParticipantCount</code>).
+    </p>
+    <p style="font-size:13.5px;">
+      <strong style="color:var(--ink)">Everything resets after every reveal.</strong> <code>doReveal</code>
+      saves the result (winner, total votes, in settings) and the streak history, and in that same write
+      deletes every tally count, every voter marker and every stats choice, so each round starts from zero.
     </p>
   </section>
 
@@ -196,8 +289,8 @@
         <thead><tr><th>Collection</th><th>What it holds</th><th>Who can read it</th></tr></thead>
         <tbody>
           <tr><td class="coll">sotw_profiles</td><td>The roster — each teammate's name, plus their photo if they've added one. Nothing else</td><td class="who">Everyone</td></tr>
-          <tr><td class="coll">sotw_claims</td><td>Which name has been tapped. Written once, when someone taps it, and never changed after — only ever deleted and re-created</td><td class="who">Everyone</td></tr>
-          <tr><td class="coll">sotw_meta/settings</td><td>Is voting open, which week it is, is the week paused, has it been revealed, who won</td><td class="who">Everyone</td></tr>
+          <tr><td class="coll">sotw_claims</td><td>Which name has been tapped, plus a "last seen" heartbeat that browser refreshes every 30s. Who it's claimed by never changes after — only ever deleted and re-created</td><td class="who">Everyone</td></tr>
+          <tr><td class="coll">sotw_meta/settings</td><td>Is voting open, which week it is, has it been revealed, who won</td><td class="who">Everyone</td></tr>
           <tr><td class="coll">sotw_voters</td><td>That a person has voted this week. There is no field here for who they voted for</td><td class="who">Everyone</td></tr>
           <tr><td class="coll">sotw_tally</td><td>The running count of votes for each candidate — numbers only, no names attached to them</td><td class="who">Everyone, once voting closes</td></tr>
           <tr><td class="coll">sotw_stat_status</td><td>Each person's own "stats up" or "stats down" for the current week</td><td class="who">Everyone</td></tr>
@@ -212,12 +305,12 @@
   <section>
     <h2 class="section-head"><span class="num">04</span> What's protected</h2>
     <div class="guarantee-list">
-      <div class="guarantee"><span class="check">✓</span><p><strong>Nobody can learn who voted for whom.</strong> It is never recorded — not for teammates, not for KG, not for anyone reading the raw database. Two things get stored: that a person voted, and a running count for each candidate, and neither field can be stretched to carry the other (the rules reject any extra field on either doc). This is a real guarantee, not a convention — it holds regardless of who's asking, because nobody is ever checked.</p></div>
-      <div class="guarantee"><span class="check">✓</span><p><strong>The count is unreadable while voting is open.</strong> Whether it's KG, a teammate, or someone poking the database directly, the read is refused until voting closes — so nobody can watch a number tick up and work out who just voted. Once it closes, anyone can technically read it — but the app itself has no per-candidate view at all any more, for KG or anyone: the only thing shown is turnout, and then the winner.</p></div>
+      <div class="guarantee"><span class="check">✓</span><p><strong>Nobody can learn who voted for whom.</strong> It is never recorded — not for teammates, not for KG, Steph, or OB, not for anyone reading the raw database. Two things get stored: that a person voted, and a running count for each candidate, and neither field can be stretched to carry the other (the rules reject any extra field on either doc). This is a real guarantee, not a convention — it holds regardless of who's asking, because nobody is ever checked.</p></div>
+      <div class="guarantee"><span class="check">✓</span><p><strong>The count is unreadable while voting is open.</strong> Whether it's a revealer, a teammate, or someone poking the database directly, the read is refused until voting closes — so nobody can watch a number tick up and work out who just voted. Once it closes, anyone can technically read it — but the app itself has no per-candidate view at all any more, for anyone: the only thing shown is turnout, and then the winner.</p></div>
     </div>
     <p style="font-size:13px;margin-top:12px;">
       What's <em>not</em> a database-level guarantee any more, now that this app dropped every form of
-      sign-in: "one name, one person" and "only KG runs the session" are conventions the app's own
+      sign-in: "one name, one person" and "only KG, Steph, or OB can reveal" are conventions the app's own
       screens follow, not things the rules can verify — there's no identity left to check them against.
       A name being claimed by <em>somebody</em> can't be un-claimed out from under them by a second tap
       (the record is create-only), but nothing stops a browser from claiming a different name that isn't

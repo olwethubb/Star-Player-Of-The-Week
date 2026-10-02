@@ -1,13 +1,13 @@
 import { onSnapshot } from 'firebase/firestore';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { claimsCol, profilesCol, settingsRef, statStatusCol, votersCol } from '@/lib/firebase';
-import { DEFAULT_SETTINGS, isAdminProfile, isHostProfile } from '@/types/firestore';
+import { DEFAULT_SETTINGS, isRevealerProfile } from '@/types/firestore';
 import type { Claim, Profile, Settings, StatDeclaration, Voter } from '@/types/firestore';
 import { getWeekKey } from '@/lib/week';
-import { RUNOFF_ANNOUNCE_MS } from '@/lib/constants';
+import { CLAIM_HEARTBEAT_MS } from '@/lib/constants';
 import { clearAllLocalPicks, getLocalPick } from '@/lib/localPick';
 import { localIdentity } from '@/lib/localIdentity';
-import { rollWeek, startRunoff } from '@/services/voting.service';
+import * as votingService from '@/services/voting.service';
 import * as claimsService from '@/services/claims.service';
 import { SessionContext, type SessionState } from './SessionContext';
 
@@ -52,10 +52,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [myUid, setMyUid] = useState<string | null>(() => localIdentity.get());
 
   const rollingWeek = useRef(false);
-  const startingRunoff = useRef(false);
   // Shields a name we just claimed from the orphan-check effect below, for the one
   // moment where it would otherwise misfire — see that effect's comment.
   const justClaimedUid = useRef<string | null>(null);
+  // Lets the stale-claim sweep below read the latest claims from inside a long-lived
+  // interval without restarting that interval every time any claim changes — see
+  // that effect's own comment.
+  const sweepInputsRef = useRef<{
+    claims: Record<string, Claim>;
+    statuses: Record<string, StatDeclaration>;
+    currentWeek: string | null;
+  }>({ claims: {}, statuses: {}, currentWeek: null });
 
   // The five collections every client watches, all subscribed immediately on mount —
   // there's no identity to wait on any more before reading. All are small and all are
@@ -136,16 +143,53 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setMyUid(null);
   }, [loadedClaims, claims, myUid]);
 
+  useEffect(() => {
+    sweepInputsRef.current = { claims, statuses: statStatuses, currentWeek: settings.currentWeek };
+  }, [claims, statStatuses, settings.currentWeek]);
+
+  // The heartbeat: as long as this browser's tab is actually open with a claimed
+  // name, it proves that every CLAIM_HEARTBEAT_MS — see touchClaim. Fires once right
+  // away too, so lastSeenAt exists from the start rather than only after the first
+  // interval tick. A missed beat (offline, a backgrounded tab the browser throttled)
+  // just means this claim looks very slightly less fresh than it is; the sweep below
+  // gives it CLAIM_STALE_AFTER_MS of slack before treating that as actually gone.
+  useEffect(() => {
+    if (!myUid) return;
+    claimsService.touchClaim(myUid).catch(() => {});
+    const timer = setInterval(() => {
+      claimsService.touchClaim(myUid).catch(() => {});
+    }, CLAIM_HEARTBEAT_MS);
+    return () => clearInterval(timer);
+  }, [myUid]);
+
+  // The other half: every open tab (not just a revealer's — turnout accuracy matters
+  // to whoever's just trying to vote too) periodically frees up any claim nobody's
+  // heartbeat has touched in a while, so a name left over from a closed tab stops
+  // counting as "signed in". Reads sweepInputsRef rather than depending on `claims`
+  // directly so this timer doesn't restart — and double-fire — every time any
+  // browser's heartbeat lands and `claims` updates.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const { claims: c, statuses, currentWeek } = sweepInputsRef.current;
+      claimsService
+        .releaseStaleClaims(c, statuses, currentWeek)
+        .catch((err) => console.warn('Stale-claim sweep failed:', err instanceof Error ? err.message : err));
+    }, CLAIM_HEARTBEAT_MS);
+    return () => clearInterval(timer);
+  }, []);
+
   const me = myUid ? profiles[myUid] ?? null : null;
-  const isHost = isHostProfile(me);
-  const canManageTeam = isHost || isAdminProfile(me);
+  // See REVEALER_NAMES in types/firestore.ts — KG, Steph, or OB, each independently,
+  // not a priority fallback. A revealer votes like anyone else; this only ever gates
+  // the reveal action and the Team panel.
+  const canReveal = isRevealerProfile(me);
 
   // Mirrors this browser's stored pick into React state so the vote grid re-renders
   // the moment it changes. localStorage is the source of truth (the server has no
   // copy — that's the point), but reading it during render wouldn't re-run when it's
   // written, leaving the "Voted" tick on the wrong card until something else nudged a
-  // render. Re-reads whenever the week changes, so a rollover or runoff starts clean.
-  // Re-reads on `round` as well as the week: a runoff or a fresh round wipes the tally
+  // render. Re-reads whenever the week changes, so a rollover starts clean. Re-reads
+  // on `round` as well as the week: resetting or restarting a round wipes the tally
   // without changing the week key, and bumps round instead — that's the signal this
   // browser's remembered pick no longer refers to anything. See lib/localPick.ts.
   const [myPick, setMyPick] = useState<string | null>(() =>
@@ -157,41 +201,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [settings.currentWeek, settings.round, myUid]);
 
   // Nobody clicks a button for this — the moment the voting week changes (Friday, per
-  // getWeekKey's Thursday-to-Friday boundary), the host's client silently clears last
-  // week's votes and opens a fresh one, whether or not anyone revealed the last one.
+  // getWeekKey's Thursday-to-Friday boundary), a revealer's client silently clears
+  // last week's votes and advances to the new week, whether or not anyone revealed
+  // the last one. Voting itself still opens locked — rollWeek leaves votingOpen:false,
+  // so a revealer still has to tap Start Voting once the new week lands. Gated on canReveal
+  // purely so one of a small trusted set does it rather than every open tab racing —
+  // if more than one of KG/Steph/OB happen to be online right at the boundary, they
+  // may both attempt it, but the writes are idempotent so that's harmless.
   useEffect(() => {
-    if (!loadedSettings || rollingWeek.current || !isHost) return;
+    if (!loadedSettings || rollingWeek.current || !canReveal) return;
     const key = getWeekKey();
     if (settings.currentWeek === key) return;
     rollingWeek.current = true;
-    rollWeek(key)
+    votingService
+      .rollWeek(key)
       .catch((err) => console.warn('Automatic week rollover failed:', err instanceof Error ? err.message : err))
       .finally(() => {
         rollingWeek.current = false;
       });
-  }, [loadedSettings, isHost, settings.currentWeek]);
-
-  // Nor for this — the moment the host's client sees a tie was just announced
-  // (revealed, more than one winner, no runoff yet), it waits long enough for the tie
-  // to actually be readable on screen, then reopens voting restricted to those names.
-  // startRunoff's own transaction is the real guard; this ref just stops one client
-  // firing the timer twice.
-  useEffect(() => {
-    if (!loadedSettings || startingRunoff.current || !isHost) return;
-    if (!(settings.revealed && settings.winnerUids.length > 1 && !settings.runoffUids)) return;
-    startingRunoff.current = true;
-    const timer = setTimeout(() => {
-      startRunoff(settings.winnerUids)
-        .catch((err) => console.warn('Automatic runoff failed to start:', err instanceof Error ? err.message : err))
-        .finally(() => {
-          startingRunoff.current = false;
-        });
-    }, RUNOFF_ANNOUNCE_MS);
-    return () => {
-      clearTimeout(timer);
-      startingRunoff.current = false;
-    };
-  }, [loadedSettings, isHost, settings.revealed, settings.winnerUids, settings.runoffUids]);
+  }, [loadedSettings, canReveal, settings.currentWeek]);
 
   const claimName = useCallback(async (profileUid: string) => {
     // A name change shouldn't inherit the last person's vote state on a shared device.
@@ -205,15 +233,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setMyUid(profileUid);
   }, []);
 
+  // Going Home: one vote per device, so this takes back the vote this device cast
+  // (only while voting's still open — after a reveal everything's already been wiped,
+  // and with voting locked there's nothing live to take back), then frees the name
+  // and its stats choice. Votes this person RECEIVED are on their own count and are
+  // never touched. Retraction failing must never strand someone unable to leave, so
+  // it's best-effort and the sign-out goes ahead regardless.
   const releaseName = useCallback(async () => {
     if (!myUid) return;
+    if (myPick && settings.votingOpen && !settings.revealed) {
+      await votingService
+        .retractVote(myUid, myPick)
+        .catch((err) => console.warn('Could not take back vote:', err instanceof Error ? err.message : err));
+    }
     clearAllLocalPicks();
     setMyPick(null);
     await claimsService.releaseName(myUid);
     if (justClaimedUid.current === myUid) justClaimedUid.current = null;
     localIdentity.clear();
     setMyUid(null);
-  }, [myUid]);
+  }, [myUid, myPick, settings.votingOpen, settings.revealed]);
 
   const value: SessionState = {
     profiles,
@@ -231,8 +270,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     me,
     myPick,
     setMyPick,
-    isHost,
-    canManageTeam,
+    canReveal,
     claimName,
     releaseName,
   };

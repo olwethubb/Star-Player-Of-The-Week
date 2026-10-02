@@ -12,10 +12,6 @@ interface VoteGridProps {
    * empty roster needs more people added, a populated one just needs them to open
    * the app and declare their status for the week. */
   teammateCount: number;
-  /** The host reaches the closed-voting state too, now that they vote like everyone
-   * else — and telling them to "check back once KG opens it" would be telling them to
-   * wait on themselves, with the button that does it sitting right below. */
-  isHost: boolean;
   /** Read from this browser's own storage, not the server — nothing server-side
    * records who you picked. See lib/localPick.ts. */
   myPick: string | null;
@@ -23,17 +19,14 @@ interface VoteGridProps {
   onVote: (uid: string) => void;
 }
 
-export function VoteGrid({ votingOpen, others, teammateCount, isHost, myPick, pendingUid, onVote }: VoteGridProps) {
+/** Rendered for everyone who's declared their stats this week — including whoever
+ * can reveal the winner (KG, Steph, OB). They vote here exactly like anyone else;
+ * the only thing that sets them apart lives in SessionControls below, not here. */
+export function VoteGrid({ votingOpen, others, teammateCount, myPick, pendingUid, onVote }: VoteGridProps) {
   const streaks = useStreaks();
 
   if (!votingOpen) {
-    return (
-      <EmptyState icon={<IconLock />}>
-        {isHost
-          ? "Voting is closed. Start it below when you're ready — you vote in it too."
-          : "Voting hasn't opened yet this week. Check back once KG opens it."}
-      </EmptyState>
-    );
+    return <EmptyState icon={<IconLock />}>Voting hasn't opened yet this week. Check back once it opens.</EmptyState>;
   }
   if (others.length === 0) {
     return (
@@ -62,7 +55,7 @@ export function VoteGrid({ votingOpen, others, teammateCount, isHost, myPick, pe
               <div className="min-w-0 flex-1 font-display text-[15px] font-semibold [overflow-wrap:anywhere]">
                 {p.name}
                 {!!streak && streak >= 3 && (
-                  <span className="ml-1.5 whitespace-nowrap font-mono text-[11px] font-normal text-accent" title={`Received votes ${streak} weeks running`}>
+                  <span className="ml-1.5 whitespace-nowrap font-mono text-[11px] font-normal text-accent-ink" title={`Received votes ${streak} weeks running`}>
                     🔥{streak}
                   </span>
                 )}
@@ -83,10 +76,7 @@ export function VoteGrid({ votingOpen, others, teammateCount, isHost, myPick, pe
       </div>
       <div className="mb-6 flex items-start gap-2.5 rounded-xl border border-border-soft bg-bg-elevated px-4 py-3 text-[13px] leading-relaxed text-text-muted">
         <IconLock className="mt-0.5 text-text-muted" />
-        <span>
-          {myPick ? 'Your vote is in — tap another name to change it.' : "You haven't voted yet."} Who you picked is
-          never sent anywhere — not to KG, not to anyone.
-        </span>
+        <span>{myPick ? 'Your vote is in — tap another name to change it.' : "You haven't voted yet."}</span>
       </div>
     </>
   );

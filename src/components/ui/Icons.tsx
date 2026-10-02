@@ -16,6 +16,15 @@ export function IconLock(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function IconHome(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg width={15} height={15} viewBox="0 0 24 24" strokeWidth={2} {...base} {...props}>
+      <path d="M3 10.5 12 3l9 7.5" />
+      <path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5" />
+    </svg>
+  );
+}
+
 export function IconCheck(props: SVGProps<SVGSVGElement>) {
   return (
     <svg width={14} height={14} viewBox="0 0 24 24" strokeWidth={3} {...base} {...props}>

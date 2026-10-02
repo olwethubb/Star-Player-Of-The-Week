@@ -21,9 +21,9 @@ rules_version = '2';
 //      second browser from claiming a DIFFERENT already-taken name by going around
 //      the app's own UI. Small trusted team, nothing at stake — that trade was made
 //      on purpose.
-//   2. The host's controls (open/close voting, reveal, manage the roster) are
-//      enforced by the app's UI only showing them to whoever's claimed KG — not by
-//      the database refusing anyone else.
+//   2. The reveal controls (reveal the winner, manage the roster) are enforced by
+//      the app's UI only showing them to whoever's claimed KG, Steph, or OB — not
+//      by the database refusing anyone else.
 //
 // What DID survive, and is still enforced right here regardless of the above: nobody
 // voted for whom is ever recorded anywhere (see sotw_voters), and the per-candidate
@@ -37,16 +37,12 @@ service cloud.firestore {
     function settingsData() {
       return get(/databases/$(database)/documents/sotw_meta/settings).data;
     }
-    // Only true while the host has explicitly opened this week's voting window
-    // ("Start Voting" / "End Voting"). Uses .get() with a default since a settings
-    // doc written before this field existed genuinely has no `votingOpen` key.
+    // True for the whole week, from rollover until whoever's revealing closes it as
+    // part of that same click — see doReveal in voting.service.ts. Uses .get() with
+    // a default since a settings doc written before this field existed genuinely
+    // has no `votingOpen` key.
     function votingIsOpen() {
       return settingsData().get('votingOpen', false) == true;
-    }
-    // Null outside a runoff. During a runoff it's the tied uids from last round —
-    // voting is still open to everyone, but only for one of these.
-    function currentRunoffUids() {
-      return settingsData().get('runoffUids', null);
     }
     function currentWeekKey() {
       return settingsData().get('currentWeek', null);
@@ -83,17 +79,25 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // Marks a name as taken. create-only: Firestore fires `create` exclusively when
-    // the document doesn't already exist, so two taps landing on the same name at the
-    // same moment resolve to whoever's write lands first, and `update: false` means
-    // the loser can never overwrite it. That's the one piece of this app's identity
-    // model the database still actually enforces — see the file header for what it
-    // doesn't. Releasing a name (handing over the device, or the host freeing one
-    // stuck on a browser nobody has any more) is a delete, then a fresh create.
+    // Marks a name as taken. create-only for the part that matters: Firestore fires
+    // `create` exclusively when the document doesn't already exist, so two taps
+    // landing on the same name at the same moment resolve to whoever's write lands
+    // first, and `claimedAt` itself can never be changed once written — that's the
+    // one piece of this app's identity model the database still actually enforces —
+    // see the file header for what it doesn't. Releasing a name (handing over the
+    // device, or a revealer freeing one stuck on a browser nobody has any more) is a
+    // delete, then a fresh create.
+    //
+    // The one update a claim CAN ever take: refreshing `lastSeenAt`, a heartbeat the
+    // claiming browser writes every so often while it's actually open (see
+    // touchClaim/releaseStaleClaims in claims.service.ts) — this is what lets a
+    // closed tab eventually be told apart from someone still genuinely there,
+    // without ever letting an update repoint who owns the name.
     match /sotw_claims/{uid} {
       allow read: if true;
       allow create: if request.resource.data.keys().hasOnly(['claimedAt']);
-      allow update: if false;
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastSeenAt'])
+                    && request.resource.data.lastSeenAt is timestamp;
       allow delete: if true;
     }
 
@@ -132,7 +136,6 @@ service cloud.firestore {
       allow read: if !votingIsOpen();
       allow create: if votingIsOpen()
                     && isEligibleCandidate(uid)
-                    && (currentRunoffUids() == null || uid in currentRunoffUids())
                     && request.resource.data.keys().hasOnly(['count'])
                     && request.resource.data.count == 1;
       allow update: if votingIsOpen()
@@ -144,9 +147,7 @@ service cloud.firestore {
                       // that's someone correcting away from an earlier pick, and a
                       // candidate who switches to 'down' (or gets un-claimed) mid-week
                       // must not leave an already-cast vote stuck with no way back off.
-                      (request.resource.data.count - resource.data.count == 1
-                        && isEligibleCandidate(uid)
-                        && (currentRunoffUids() == null || uid in currentRunoffUids()))
+                      (request.resource.data.count - resource.data.count == 1 && isEligibleCandidate(uid))
                       || (request.resource.data.count - resource.data.count == -1)
                     );
       allow delete: if true;

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { IconTrophy } from '@/components/ui/Icons';
 import type { Profile } from '@/types/firestore';
 
@@ -10,6 +10,10 @@ interface WheelProps {
    * (see useRevealCeremony), so the wheel settles with a brief crossfade instead of
    * either a full spin or an instant, disorienting jump. */
   spinMs: number;
+  /** True once the spin's finished and the result is showing — see
+   * useRevealCeremony's 'landed' phase. A tie landed triggers the break effect below;
+   * a single winner just stops spinning, same as always. */
+  landed: boolean;
   children?: ReactNode;
 }
 
@@ -30,9 +34,32 @@ const DENSE_ROSTER_THRESHOLD = 14;
  * Both the wheel and its labels carry `motion-exempt` (see globals.css) so they drive
  * their own transition duration via `spinMs` instead of being collapsed to near-zero by
  * the blanket prefers-reduced-motion rule that governs everything else in the app. */
-export function Wheel({ profiles, winnerUids, totalVotes, spinMs, children }: WheelProps) {
+export function Wheel({ profiles, winnerUids, totalVotes, spinMs, landed, children }: WheelProps) {
   const wheelRef = useRef<HTMLDivElement>(null);
   const labelRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  // A tie doesn't get resolved down to one name — the wheel spins normally, then
+  // breaks in two the moment it lands, and every tied name is revealed together in
+  // the popup that sits underneath it (see WinnerPopup / joinNames).
+  const isTie = landed && totalVotes > 0 && winnerUids.length > 1;
+  // Set one frame after the break halves mount, so they paint once exactly where the
+  // whole wheel was before transitioning apart — otherwise they'd jump straight to
+  // their end position with no visible break at all.
+  const [broken, setBroken] = useState(false);
+
+  useEffect(() => {
+    if (!isTie) {
+      setBroken(false);
+      return;
+    }
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => setBroken(true));
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [isTie]);
 
   const names = useMemo(
     () => Object.entries(profiles).sort((a, b) => a[1].name.localeCompare(b[1].name)),
@@ -86,15 +113,52 @@ export function Wheel({ profiles, winnerUids, totalVotes, spinMs, children }: Wh
     return () => cancelAnimationFrame(raf1);
   }, [targetDeg]);
 
+  const labelClass = `absolute line-clamp-2 max-w-[28%] overflow-hidden text-center font-display font-bold leading-tight text-text ${
+    dense ? 'text-[clamp(8px,1.6vw,11px)]' : 'text-[clamp(10px,2.2vw,15px)]'
+  }`;
+
+  // A frozen copy of the wheel exactly as it landed — same gradient, same rotation,
+  // same upright labels — for the two break halves. No transition on it: it never
+  // moves itself, only the clipped half containing it does.
+  const landedDisc = (
+    <div
+      className="absolute inset-0 overflow-hidden rounded-full border-[5px] border-accent shadow-card"
+      style={{ background: `conic-gradient(from 0deg, ${bgStops})`, transform: `rotate(${targetDeg}deg)` }}
+    >
+      {names.map(([uid, p], i) => (
+        <span
+          key={uid}
+          className={labelClass}
+          style={{
+            left: `${labelPositions[i]?.x}%`,
+            top: `${labelPositions[i]?.y}%`,
+            transform: `translate(-50%,-50%) rotate(${-targetDeg}deg)`,
+          }}
+        >
+          {p.name}
+        </span>
+      ))}
+    </div>
+  );
+
   return (
     <div className="relative mx-auto mt-2 aspect-square w-[min(80vw,62vh,560px)]">
       <div
-        className="absolute -top-2 left-1/2 z-[3] h-0 w-0 -translate-x-1/2 border-x-[18px] border-t-[28px] border-x-transparent border-t-accent drop-shadow-[0_2px_4px_rgba(32,26,20,0.35)]"
+        className={`absolute -top-2 left-1/2 z-[3] h-0 w-0 -translate-x-1/2 border-x-[18px] border-t-[28px] border-x-transparent border-t-accent drop-shadow-[0_2px_4px_rgba(10,10,10,0.35)] transition-opacity duration-500 ${
+          broken ? 'opacity-0' : ''
+        }`}
       />
       <div
         ref={wheelRef}
         className="motion-exempt absolute inset-0 overflow-hidden rounded-full border-[5px] border-accent shadow-card transition-transform [transition-timing-function:cubic-bezier(.1,.7,.15,1)]"
-        style={{ background: `conic-gradient(from 0deg, ${bgStops})`, transitionDuration: `${spinMs}ms` }}
+        style={{
+          background: `conic-gradient(from 0deg, ${bgStops})`,
+          transitionDuration: `${spinMs}ms`,
+          // Swapped out instantly, not faded: the two break halves below mount in
+          // exactly this spot showing exactly this wheel, so the handoff is
+          // invisible — the break itself is the only motion anyone sees.
+          visibility: isTie ? 'hidden' : 'visible',
+        }}
       >
         {names.map(([uid, p], i) => (
           <span
@@ -102,15 +166,19 @@ export function Wheel({ profiles, winnerUids, totalVotes, spinMs, children }: Wh
             ref={(el) => {
               labelRefs.current[i] = el;
             }}
-            className={`motion-exempt absolute line-clamp-2 max-w-[28%] -translate-x-1/2 -translate-y-1/2 overflow-hidden text-center font-display font-bold leading-tight text-text transition-transform [transition-timing-function:cubic-bezier(.1,.7,.15,1)] ${
-              dense ? 'text-[clamp(8px,1.6vw,11px)]' : 'text-[clamp(10px,2.2vw,15px)]'
-            }`}
+            className={`motion-exempt ${labelClass} -translate-x-1/2 -translate-y-1/2 transition-transform [transition-timing-function:cubic-bezier(.1,.7,.15,1)]`}
             style={{ left: `${labelPositions[i]?.x}%`, top: `${labelPositions[i]?.y}%`, transitionDuration: `${spinMs}ms` }}
           >
             {p.name}
           </span>
         ))}
       </div>
+      {isTie && (
+        <div className="pointer-events-none absolute inset-0 z-[1]" aria-hidden="true">
+          <div className={`wheel-break-half wheel-break-left ${broken ? 'wheel-break-go' : ''}`}>{landedDisc}</div>
+          <div className={`wheel-break-half wheel-break-right ${broken ? 'wheel-break-go' : ''}`}>{landedDisc}</div>
+        </div>
+      )}
       <div className="absolute left-1/2 top-1/2 z-[2] flex min-h-14 min-w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-[3px] border-accent bg-bg-card text-accent shadow-card [width:22%] [height:22%]">
         <IconTrophy />
       </div>

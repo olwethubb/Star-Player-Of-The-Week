@@ -37,29 +37,22 @@ export function useCastVote() {
   return { castVote, pendingUid };
 }
 
-export function useSessionControls() {
+export function useStartVoting() {
   const { notify } = useToast();
   const [pending, setPending] = useState(false);
 
-  const run = useCallback(
-    async (action: () => Promise<unknown>, failure: string) => {
-      setPending(true);
-      try {
-        await action();
-      } catch (err) {
-        notify(friendlyError(err, failure));
-      } finally {
-        setPending(false);
-      }
-    },
-    [notify],
-  );
+  const start = useCallback(async () => {
+    setPending(true);
+    try {
+      await votingService.startVoting();
+    } catch (err) {
+      notify(friendlyError(err, 'Could not start voting. Try again in a moment.'));
+    } finally {
+      setPending(false);
+    }
+  }, [notify]);
 
-  return {
-    start: useCallback(() => run(votingService.startVoting, 'Could not start voting. Try again in a moment.'), [run]),
-    end: useCallback(() => run(votingService.endVoting, 'Could not end voting. Try again in a moment.'), [run]),
-    pending,
-  };
+  return { start, pending };
 }
 
 export function useDoReveal() {

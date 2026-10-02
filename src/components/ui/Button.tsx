@@ -9,13 +9,14 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const base = 'font-medium transition-transform duration-150 active:scale-[0.97] disabled:opacity-50 disabled:cursor-default disabled:active:scale-100 cursor-pointer';
 
 const variants: Record<Variant, string> = {
+  // Solid orange, white text, darkens on hover — blacfox's own .btn-primary exactly.
   primary:
-    'w-full font-display font-bold text-[15px] bg-accent text-accent-contrast rounded-full py-3.5 px-6 min-h-12 hover:brightness-110',
+    'w-full font-display font-bold text-[15px] bg-accent text-accent-contrast rounded-full py-3.5 px-6 min-h-12 hover:bg-accent-dark',
   // The gate CTA used to be a clip-path polygon with a notched corner — the only
   // element in the app using that shape language, and it read as a rendering glitch
   // rather than a decision. Now it's simply the primary button, sized for a form.
   gate:
-    'w-full rounded-xl font-display font-bold text-[15px] bg-accent text-accent-contrast py-3.5 px-5 min-h-12 shadow-[0_6px_18px_rgba(255,90,31,0.26)] hover:brightness-105',
+    'w-full rounded-xl font-display font-bold text-[15px] bg-accent text-accent-contrast py-3.5 px-5 min-h-12 shadow-[0_6px_18px_rgba(233,92,37,0.26)] hover:bg-accent-dark',
   ghost:
     'border border-border text-text rounded-full py-3 px-5 min-h-[46px] text-sm font-semibold hover:border-accent hover:text-accent bg-transparent',
   small:

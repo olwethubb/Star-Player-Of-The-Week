@@ -84,7 +84,6 @@ export const DEMO_WEEK = getWeekKey();
 export const DEMO_SETTINGS = {
   revealed: false,
   revealing: false,
-  runoffUids: null,
   winnerUids: [],
   totalVotes: 0,
   votingOpen: true,

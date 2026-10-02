@@ -1,3 +1,4 @@
+import { joinNames } from '@/lib/winners';
 import type { Profile, Settings } from '@/types/firestore';
 
 /** Deliberately plain text, not a card — this used to be a glowing trophy graphic
@@ -15,19 +16,22 @@ export function WinnerBlock({ settings, profiles }: { settings: Settings; profil
     const winner = profiles[winnerUids[0]!];
     return (
       <p className="mb-6 text-base leading-relaxed text-text">
-        🏆 <strong className="font-display font-semibold">{winner?.name ?? 'Unknown'}</strong> is the Star Player of
-        the Week!
+        🏆 <strong className="font-display font-extrabold italic text-accent">{winner?.name ?? 'Unknown'}</strong> is
+        the Star Player of the Week!
       </p>
     );
   }
 
+  // A tie is never resolved down to one name — however many are tied (two, six,
+  // doesn't matter), they're all Star Players of the Week together.
+  const names = joinNames(
+    winnerUids.map((u) => profiles[u]?.name ?? '?'),
+    'and',
+  );
   return (
     <p className="mb-6 text-base leading-relaxed text-text">
-      It's a tie between{' '}
-      <strong className="font-display font-semibold">
-        {winnerUids.map((u) => profiles[u]?.name ?? '?').join(' and ')}
-      </strong>
-      . A runoff between just them starts automatically in a few seconds.
+      🏆 It's a tie — <strong className="font-display font-extrabold italic text-accent">{names}</strong> are all
+      Star Players of the Week!
     </p>
   );
 }

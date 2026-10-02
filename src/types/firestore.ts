@@ -13,9 +13,19 @@ export interface Profile {
 /** Marks one roster name as taken. There's no sign-in of any kind behind this app any
  * more, so this is a convention the app's own UI respects (first tap wins the create,
  * and the UI greys out anyone already claimed), not something the database can verify
- * belongs to a particular person — see lib/localIdentity.ts for the trade-off. */
+ * belongs to a particular person — see lib/localIdentity.ts for the trade-off.
+ *
+ * Claiming a name has no expiry on its own — closing a tab doesn't release it, so
+ * without something else watching, a name claimed once could sit "taken" forever.
+ * `lastSeenAt` is that something else: a heartbeat the claiming browser refreshes
+ * every CLAIM_HEARTBEAT_MS while it's actually open (see touchClaim in
+ * claims.service.ts), so a claim nobody's refreshed in a while can be told apart
+ * from one that's still genuinely in use. `claimedAt` itself never changes once
+ * written — see firestore.rules, which allows updating `lastSeenAt` alone and
+ * nothing else on this doc. */
 export interface Claim {
   claimedAt: Timestamp | null;
+  lastSeenAt?: Timestamp | null;
 }
 
 export interface Tally {
@@ -37,18 +47,17 @@ export interface Voter {
 export interface Settings {
   revealed: boolean;
   revealing: boolean;
+  /** Every uid tied for the most votes — just one most weeks, but a tie is never
+   * resolved down to a single name. See computeWinners/joinNames in lib/winners.ts
+   * for how arbitrarily many tied names get computed and shown together. */
   winnerUids: string[];
   totalVotes: number;
-  /** Non-null while a runoff round is the active vote: everyone can still vote, but
-   * only for one of these uids — the ones who tied last round. Null outside of a
-   * runoff, including during a normal week's voting. */
-  runoffUids: string[] | null;
   votingOpen: boolean;
   currentWeek: string | null;
-  /** Bumped every time the tally is wiped WITHIN the same week — a runoff, or the host
-   * starting a fresh round after a reveal. Local vote picks are keyed by week AND
-   * round (see lib/localPick.ts), so bumping this is what invalidates every browser's
-   * remembered pick at the same instant the counts it referred to are deleted.
+  /** Bumped every time the tally is wiped WITHIN the same week — a revealer resetting
+   * or restarting a round. Local vote picks are keyed by week AND round (see
+   * lib/localPick.ts), so bumping this is what invalidates every browser's remembered
+   * pick at the same instant the counts it referred to are deleted.
    *
    * Without it, a browser would still think it had voted for someone whose tally doc
    * no longer exists, and its next vote would try to decrement a deleted count — a
@@ -63,7 +72,6 @@ export const DEFAULT_SETTINGS: Settings = {
   revealing: false,
   winnerUids: [],
   totalVotes: 0,
-  runoffUids: null,
   votingOpen: false,
   currentWeek: null,
   round: 0,
@@ -91,12 +99,14 @@ export interface WeeklyActivity {
   received: boolean;
 }
 
-/** Whoever claims this name runs the session: they open and close voting and trigger
- * the reveal. They still vote and can still be voted for like anyone else — hosting
- * is the extra controls, not a different kind of membership, and there's no
- * per-candidate view for them to see either way. Matched on the roster name rather
- * than a stored flag because that's the whole rule — "whoever picks KG reveals" —
- * and it keeps the roster free of admin plumbing. */
+/** KG is the CEO, and — separately from anything about revealing — is never a vote
+ * candidate: not asked to declare stats, never eligible for a vote, no matter what
+ * MainScreen's isEligibleCandidate says about claims/declarations alone. This stays
+ * pinned to the name KG specifically, even though the reveal action itself (see
+ * REVEALER_NAMES below) is also available to Steph and OB — being able to reveal
+ * doesn't make either of them the CEO too. Also the name the app bootstraps the very
+ * first profile as (see NamePicker's BootstrapFirstRun). Matched on the roster name
+ * rather than a stored flag, same reasoning as ADMIN_NAME below. */
 export const HOST_NAME = 'KG';
 
 export function isHostName(name: string | null | undefined): boolean {
@@ -107,16 +117,44 @@ export function isHostProfile(profile: Profile | null | undefined): boolean {
   return isHostName(profile?.name);
 }
 
-/** Whoever's signed in as this name can manage the roster (add, rename, remove
- * teammates) year-round, regardless of who's claimed KG that week — the person
- * actually running this deployment, not a rotating hosting duty. Matched on name for
- * the same reason KG is: no accounts, no roles, just a name someone claims. */
+/** The one other name (besides KG) matched specifically rather than by role — OB is
+ * the person actually running this deployment, independent of anything to do with a
+ * given week's vote. Its only remaining use is as one of the three REVEALER_NAMES
+ * below; it used to also unlock the Team panel on its own, but that's now just
+ * "can this browser reveal" like KG and Steph — see canReveal in SessionProvider. */
 export const ADMIN_NAME = 'OB';
 
-export function isAdminName(name: string | null | undefined): boolean {
-  return !!name && name.trim().toLowerCase() === ADMIN_NAME.toLowerCase();
+/** Whoever's claimed one of these three names can reveal the week's winner — and,
+ * since that's the only privileged action left in the app, also gets the Team panel.
+ * Not a priority order and not exclusive: unlike the single-host design this
+ * replaced, any of the three who happen to be claimed at once can each act, and none
+ * of them are barred from voting themselves — they declare stats and cast a vote
+ * exactly like everyone else. It's on the team to actually check everyone's voted
+ * (by asking around the office) before one of them clicks Reveal — nothing here
+ * tracks that. Deliberately a separate concept from HOST_NAME/isHostProfile above:
+ * this is about who's trusted to close out a week, not about who the CEO is, and it
+ * never affects candidacy — see isHostName's doc comment. See isRevealerProfile. */
+export const REVEALER_NAMES = [HOST_NAME, 'Steph', ADMIN_NAME];
+
+export function isRevealerName(name: string | null | undefined): boolean {
+  const lower = name?.trim().toLowerCase();
+  return !!lower && REVEALER_NAMES.some((n) => n.toLowerCase() === lower);
 }
 
-export function isAdminProfile(profile: Profile | null | undefined): boolean {
-  return isAdminName(profile?.name);
+export function isRevealerProfile(profile: Profile | null | undefined): boolean {
+  return isRevealerName(profile?.name);
+}
+
+/** Of the three REVEALER_NAMES, only these two are flagged in the name picker's own
+ * list — a small star next to the name, visible to anyone picking who they are,
+ * before they've claimed anything. OB's ability to reveal is deliberately NOT
+ * advertised there, so nobody glancing at that list can tell OB is also a revealer.
+ * This is cosmetic only, scoped to the picker: OB has every bit of REVEALER_NAMES'
+ * actual power once claimed (the Reveal Winner button, the Team panel) — nothing
+ * elsewhere treats OB any differently from KG or Steph. See NamePicker. */
+export const PUBLIC_REVEALER_NAMES = [HOST_NAME, 'Steph'];
+
+export function isPubliclyTaggedRevealer(name: string | null | undefined): boolean {
+  const lower = name?.trim().toLowerCase();
+  return !!lower && PUBLIC_REVEALER_NAMES.some((n) => n.toLowerCase() === lower);
 }

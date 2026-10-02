@@ -24,8 +24,9 @@ let nextId = 0;
 
 /** A one-shot burst of rising particles, launched once when the winner lands —
  * denser than a typical UI flourish since this is standing in for the payoff of
- * a real moment, not just a decorative accent. */
-export function Sparks() {
+ * a real moment, not just a decorative accent. `delayMs` holds the whole burst back,
+ * so on a tie it fires as the wheel breaks open rather than while it's still whole. */
+export function Sparks({ delayMs = 0 }: { delayMs?: number }) {
   const [sparks, setSparks] = useState<Spark[]>([]);
 
   useEffect(() => {
@@ -35,14 +36,14 @@ export function Sparks() {
       left: 10 + Math.random() * 80,
       color: COLORS[Math.floor(Math.random() * COLORS.length)]!,
       duration: 1.8 + Math.random() * 1.4,
-      delay: Math.random() * 0.5,
+      delay: delayMs / 1000 + Math.random() * 0.5,
     }));
     setSparks(created);
     const timers = created.map((s) =>
       setTimeout(() => setSparks((prev) => prev.filter((p) => p.id !== s.id)), (s.duration + s.delay) * 1000 + 300),
     );
     return () => timers.forEach(clearTimeout);
-  }, []);
+  }, [delayMs]);
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[9999] overflow-hidden" aria-hidden="true">

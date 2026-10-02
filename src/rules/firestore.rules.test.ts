@@ -6,7 +6,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 
 // The regression guard for firestore.rules. This app has no sign-in of any kind —
 // not a login screen, not even an invisible one — no roles and no money. It does
@@ -17,7 +17,7 @@ import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc } from '
 //   once voting has closed, so watching one move can't be used to infer it either.
 //
 // Everything else this app used to enforce at the database level (one name per
-// person, only KG running the session) is now a convention the app's own UI
+// person, only KG/Steph/OB revealing) is now a convention the app's own UI
 // follows, not something these rules can verify — there's no identity here to check
 // it against. Every context below is `unauthenticatedContext()`, on purpose: it's
 // exactly as privileged as every other context, because these rules don't look at
@@ -149,12 +149,40 @@ describe('sotw_claims', () => {
     await assertFails(setDoc(doc(client(), 'sotw_claims', 'ob'), { claimedAt: null }));
   });
 
-  it('rejects updating an existing claim under any circumstances', async () => {
+  it('rejects repointing claimedAt via update, under any circumstances', async () => {
     await seedProfile('ob', 'OB');
     await seedClaim('ob');
     // Releasing a name is always a delete-then-create, never an update — this is
     // what stops a claim from being silently repointed at all.
-    await assertFails(updateDoc(doc(client(), 'sotw_claims', 'ob'), { claimedAt: null }));
+    await assertFails(updateDoc(doc(client(), 'sotw_claims', 'ob'), { claimedAt: serverTimestamp() }));
+  });
+
+  it('allows refreshing lastSeenAt — the one update a claim can ever take', async () => {
+    await seedProfile('ob', 'OB');
+    await seedClaim('ob');
+    await assertSucceeds(updateDoc(doc(client(), 'sotw_claims', 'ob'), { lastSeenAt: serverTimestamp() }));
+  });
+
+  it('rejects touching claimedAt alongside a lastSeenAt refresh', async () => {
+    await seedProfile('ob', 'OB');
+    await seedClaim('ob');
+    await assertFails(
+      updateDoc(doc(client(), 'sotw_claims', 'ob'), { claimedAt: serverTimestamp(), lastSeenAt: serverTimestamp() }),
+    );
+  });
+
+  it('rejects a lastSeenAt refresh carrying an extra field', async () => {
+    await seedProfile('ob', 'OB');
+    await seedClaim('ob');
+    await assertFails(
+      updateDoc(doc(client(), 'sotw_claims', 'ob'), { lastSeenAt: serverTimestamp(), votedFor: 'bob' }),
+    );
+  });
+
+  it('rejects a lastSeenAt that is not a timestamp', async () => {
+    await seedProfile('ob', 'OB');
+    await seedClaim('ob');
+    await assertFails(updateDoc(doc(client(), 'sotw_claims', 'ob'), { lastSeenAt: 'not-a-timestamp' }));
   });
 
   it('rejects extra fields on a claim — this is the doc that must never carry a vote', async () => {
@@ -343,23 +371,7 @@ describe('sotw_tally — counts only, closed to reading while voting is open', (
     await assertFails(setDoc(doc(client(), 'sotw_tally', 'ob'), { count: 1 }));
   });
 
-  it('during a runoff, rejects a first vote for someone not in the tied set', async () => {
-    await seedProfile('ob', 'OB');
-    await seedClaim('ob');
-    await seedStatUp('ob');
-    await seedSettingsThisWeek({ votingOpen: true, runoffUids: ['someone-else'] });
-    await assertFails(setDoc(doc(client(), 'sotw_tally', 'ob'), { count: 1 }));
-  });
-
-  it('during a runoff, lets a first vote count for someone who IS tied', async () => {
-    await seedProfile('ob', 'OB');
-    await seedClaim('ob');
-    await seedStatUp('ob');
-    await seedSettingsThisWeek({ votingOpen: true, runoffUids: ['ob'] });
-    await assertSucceeds(setDoc(doc(client(), 'sotw_tally', 'ob'), { count: 1 }));
-  });
-
-  it('lets anyone clear a tally doc (rollover / runoff reset)', async () => {
+  it('lets anyone clear a tally doc (rollover / round reset)', async () => {
     await seedTally('ob', 3);
     await assertSucceeds(deleteDoc(doc(client(), 'sotw_tally', 'ob')));
   });
@@ -416,8 +428,11 @@ describe('sotw_weekly_activity — what is left after the tally is wiped', () =>
 
 // ---------------------------------------------------------------------------
 // 8. LIST QUERIES — every test above reads with getDoc (single document). The
-// app itself never does that for sotw_tally: doReveal, startRunoff, startNewRound
-// and rollWeek all run a `list` query (getDocs) over the whole collection.
+// app itself never does that for sotw_tally: doReveal and startNewRound both run a
+// `list` query (getDocs) over the whole collection to read it (rollWeek is
+// the one exception — it wipes sotw_tally by deleting known profile ids instead,
+// specifically so it never needs to list this collection at all; see its own comment
+// in voting.service.ts for why).
 // Firestore evaluates `list` and `get` separately, so a rule that passes every
 // getDoc-based test above can still behave differently — or outright error —
 // under `list`. This section exists specifically to close that gap after it let

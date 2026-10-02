@@ -4,9 +4,10 @@ import { useToast } from '@/hooks/useToast';
 import { friendlyError } from '@/lib/errors';
 import type { StatLevel } from '@/types/firestore';
 
-/** Gates the vote grid: everyone has to say whether their stats are up or down
- * for the week before they can see or cast a vote. 'Down' just means nobody can
- * vote for THEM this week — they can still vote for someone who's up. */
+/** Gates the vote grid: everyone (except KG, who's never shown this — see MainScreen)
+ * has to say whether their stats are up or down for the week before they can see or
+ * cast a vote. 'Down' just means nobody can vote for THEM this week — they can still
+ * vote for someone who's up. */
 export function StatStatusGate({ uid, current }: { uid: string; current: StatLevel | null }) {
   const { notify } = useToast();
 
@@ -16,20 +17,35 @@ export function StatStatusGate({ uid, current }: { uid: string; current: StatLev
     );
   }
 
+  // Once declared, both options stay on screen as a toggle rather than collapsing to a
+  // summary with a small "Change" link — that link was easy to miss on a phone, and
+  // people took a "Stats Down" they'd tapped by mistake as locked in.
   if (current) {
+    const option = (status: StatLevel, label: string) => (
+      <button
+        type="button"
+        aria-pressed={current === status}
+        onClick={() => current !== status && pick(status)}
+        className={`min-h-11 flex-1 cursor-pointer rounded-full border px-4 text-[13px] font-semibold transition-colors ${
+          current === status
+            ? 'border-accent bg-accent text-accent-contrast'
+            : 'border-border bg-transparent text-text hover:border-accent hover:text-accent'
+        }`}
+      >
+        {label}
+      </button>
+    );
     return (
-      <div className="mb-5 flex flex-wrap items-center gap-2 rounded-xl border border-border-soft bg-bg-elevated px-4 py-3 text-[13px]">
-        <span className="text-text-muted">
-          This week you're marked <b className="text-text">{current === 'up' ? 'Stats Up' : 'Stats Down'}</b>
-          {current === 'down' && ' — you won\'t appear on the poll, but you can still vote'}
-        </span>
-        <button
-          type="button"
-          className="ml-auto cursor-pointer border-none bg-transparent p-0 text-[12px] text-text-muted underline decoration-border underline-offset-[3px] hover:text-accent hover:decoration-accent"
-          onClick={() => pick(current === 'up' ? 'down' : 'up')}
-        >
-          Change
-        </button>
+      <div className="mb-5 rounded-xl border border-border-soft bg-bg-elevated px-4 py-3">
+        <p className="m-0 mb-2.5 text-[13px] text-text-muted">
+          Your stats this week — tap to change
+          {current === 'down' &&
+            ". On \"Down\" you're off the poll and any votes you'd already received don't count — but you can still vote."}
+        </p>
+        <div className="flex gap-2" role="group" aria-label="Your stats this week">
+          {option('up', 'Stats Up')}
+          {option('down', 'Stats Down')}
+        </div>
       </div>
     );
   }

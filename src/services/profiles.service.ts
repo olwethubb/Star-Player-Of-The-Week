@@ -1,6 +1,7 @@
 import { addDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { claimRef, profileRef, profilesCol, statStatusRef, voterRef } from '@/lib/firebase';
 import { AppValidationError } from '@/lib/errors';
+import { releaseName } from './claims.service';
 
 /** Adding someone is just a name now — no account, no email, no PIN, nothing to
  * hand over. They open the app, tap their name, and they're in. Firestore mints the
@@ -28,8 +29,9 @@ export async function removeTeammate(uid: string) {
 }
 
 /** Frees a name that's stuck on a browser nobody has any more (lost phone, cleared
- * site data). The person keeps their profile, streaks and history — only the binding
- * to a device is dropped, so they can claim themselves again on the new one. */
+ * site data). The person keeps their profile and streaks — the device binding and
+ * this week's stats choice are dropped, same as Home, so they start clean on
+ * the new one. */
 export function releaseClaimFor(uid: string) {
-  return deleteDoc(claimRef(uid));
+  return releaseName(uid);
 }

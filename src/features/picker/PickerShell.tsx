@@ -28,16 +28,26 @@ export function PickerShell({ brand, children }: { brand?: ReactNode; children: 
 
 export function PickerEyebrow({ children }: { children: ReactNode }) {
   return (
-    <p className="m-0 mb-3 text-center font-mono text-[11px] uppercase tracking-[0.14em] text-accent">{children}</p>
+    <p className="m-0 mb-3 text-center text-[11px] font-bold uppercase tracking-[0.14em] text-accent">{children}</p>
   );
 }
 
+/** Bold, upright Montserrat — blacfox's own heading voice. An emphasized word or
+ * phrase isn't styled here: wrap it in the `em` component below at the call site,
+ * same split blacfox's own hero title makes ("We listen. *You close.*"). */
 export function PickerHeading({ children }: { children: ReactNode }) {
   return (
-    <h1 className="mx-auto mb-4 mt-0 max-w-[18ch] text-center font-serif text-[clamp(22px,4.2vw,36px)] font-bold italic leading-[1.08] text-on-dark [text-wrap:balance]">
+    <h1 className="mx-auto mb-4 mt-0 max-w-[20ch] text-center text-[clamp(24px,4.6vw,38px)] font-extrabold leading-[1.05] tracking-[-0.02em] text-on-dark [text-wrap:balance]">
       {children}
     </h1>
   );
+}
+
+/** The one emphasized word or phrase in a heading — italic, orange, still the same
+ * weight as the rest of the line. Use inside PickerHeading or any other heading that
+ * wants blacfox's accent-word treatment. */
+export function HeadingAccent({ children }: { children: ReactNode }) {
+  return <em className="text-accent italic">{children}</em>;
 }
 
 export function PickerBody({ children }: { children: ReactNode }) {

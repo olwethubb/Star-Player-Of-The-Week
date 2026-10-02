@@ -36,8 +36,9 @@ for (const name of [HOST, ...TEAM]) {
   uids[name] = uid;
   await setDoc(`sotw_profiles/${uid}`, { name });
 
-  // Everyone is a real, claimed participant — including the host, who votes and can be
-  // voted for like anyone else and only differs in holding the session controls.
+  // Everyone is a real, claimed, 'up' participant — including the host, who votes
+  // and declares stats exactly like anyone else, and only differs by also seeing
+  // the Reveal Winner button once they're signed in.
   if (!JOINABLE.includes(name)) {
     await setDoc(`sotw_claims/${uid}`, { claimedAt: null });
   }

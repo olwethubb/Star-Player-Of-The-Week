@@ -54,23 +54,101 @@ tap belongs to the right person: nothing stops a second browser from claiming
 a *different* already-taken name by going around the app's own UI. That trade
 was made on purpose once there was nothing left in the app worth gating behind
 real identity. If you clear your site data or switch phones, your name is
-stuck on the browser that claimed it — the host frees it from
+stuck on the browser that claimed it — a revealer (see below) frees it from
 **Team → Free up name**, then you can take it again.
 
-**KG runs the session — same trade.** Whoever's browser has claimed the
-profile named `KG` sees the host controls: open/close voting, run the reveal,
-and start a fresh round if one needs re-running before Friday. They vote and
-can be voted for like everyone else — hosting is those extra buttons, not a
-different kind of membership, and there is no per-candidate view for them to
-see either way (only turnout, then the winner). The app's UI decides this
-purely by checking the locally remembered name, so the roster **needs a
-profile called KG** or nobody sees those controls at all — and, same as above,
-the database doesn't verify who's allowed to be the one who claimed it.
+**Home — one vote per device.** Signed-in screens have a **Home** button
+(it replaced "Not you?") that signs you out back to the name picker. Going
+Home takes back the vote *this device* cast, then clears the name's
+stats-up/down choice — except a Stats Down choice, which stays so that
+leaving can't undo Down. Votes other people gave you live on your own count
+and still count at the reveal. So everyone votes on their own phone: a
+shared phone can't stack votes, because each hand-over undoes the previous
+person's vote. And if the server already has a vote from you this round but
+this device doesn't know who for (your sign-in expired, or site data was
+cleared), the app tells you your vote is in rather than letting you vote
+twice. See `retractVote` in `src/services/voting.service.ts`, `releaseName`
+in `src/context/SessionProvider.tsx` and `votedWithoutPick` in
+`MainScreen.tsx`.
 
-**OB manages the roster.** Whoever's claimed `OB` also gets the Team panel
-year-round, independent of who's hosting that week, so people can be added or
-removed without waiting on KG. Purely additive — it changes nothing about
-voting.
+**Switching to Stats Down takes your votes away.** You drop off the poll
+straight away, and at the reveal everyone's received votes count except a
+Down person's, so they end on 0 however many votes they'd picked up. Going
+Home or an expired sign-in never does that. Anyone who'd voted for them sees
+"Your vote for X doesn't count any more" and can vote again. Votes are never
+deleted mid-round, just not counted, so if X flips back to Up before the
+reveal, votes from anyone who didn't change their pick count again. See
+`countableTally` in `src/lib/roundRules.ts` and `stalePick` in
+`MainScreen.tsx`.
+
+**Everything resets after every reveal.** The reveal saves the result
+(winner, total votes) and the streak history, and in the same write wipes
+every count, every "I voted" marker and everyone's stats choice, so the next
+round starts from zero.
+
+**A claim nobody's refreshed in 15 minutes frees itself, too.** Claiming a
+name has no expiry on its own — closing a tab doesn't release it — so every
+open, claimed browser quietly "proves it's still there" every 30 seconds by
+refreshing a `lastSeenAt` heartbeat on its own claim (`touchClaim` in
+`src/services/claims.service.ts`). Every open tab, not just a revealer's,
+also checks every 30 seconds for any claim that's gone quiet longer than
+`CLAIM_STALE_AFTER_MS` (15 minutes — see `src/lib/constants.ts`) and frees
+it automatically (`releaseStaleClaims`). This is what keeps "N people have
+voted so far" honest: without it, a name claimed once and then abandoned —
+tab closed, phone put away — would count as "signed in" forever. Three
+guards keep it from signing out anyone who's really there (all in
+`findStaleClaimUids`, `src/lib/roundRules.ts`, unit-tested): anyone Up this
+round is never swept, so a locked phone can't drop a candidate off the poll;
+a heartbeat still being written counts as fresh; and staleness is measured
+against the newest server heartbeat as well as the device clock, so one
+device with a wrong clock can't sign everyone out. It only frees the claim,
+never the stats choice. The "N" in turnout counts people signed in now plus
+anyone who already voted (`roundParticipantCount`), so it can't read
+"everyone's voted" just because voters' sign-ins expired.
+
+**KG, Steph, or OB can reveal the winner — same trade.** Whoever's browser
+has claimed one of those three names sees the session controls — see
+`REVEALER_NAMES` in `src/types/firestore.ts`. Voting starts every week
+**locked**: everyone signed in, revealer included, sees a "voting hasn't
+started" screen instead of the vote grid, until one of the three taps
+**Start Voting**. From there, tapping **Reveal Winner** closes voting and
+works out the winner in the same action — nothing here is automatic, it's on
+whoever taps it to have actually checked, by asking around the office, that
+everyone's voted first. Unlike an earlier version of this app, a revealer
+votes exactly like anyone else — declares stats, shows up in the grid, casts
+a pick — this only ever gates the session controls and the Team panel (so
+the roster can be edited without waiting on any one specific person).
+Separately, and regardless of who can currently reveal, KG specifically is
+never a candidate at all — never asked to declare stats, never on anyone's
+grid — because KG is the CEO, not because of anything to do with revealing.
+The app's UI decides all of this purely by checking which names are
+currently claimed, so the roster **needs a profile called KG, Steph, or OB**
+or nobody sees those controls at all — and, same as above, the database
+doesn't verify who's allowed to be the one who claimed it. Whoever it
+applies to sees a plain banner on their own screen saying so, so a Steph or
+OB isn't left wondering why they have extra controls. The name picker itself
+only marks **KG** and **Steph** with a small star, on purpose — OB's ability
+to reveal is deliberately not advertised there, so nobody glancing at that
+list can tell OB has it too. It's cosmetic only: OB has every bit of the
+real power once claimed, just without the public tag — see
+`PUBLIC_REVEALER_NAMES` in `src/types/firestore.ts`.
+
+**Reveal Winner needs at least one vote.** Until the first vote lands, the
+button isn't there at all — a short note sits in its place.
+
+**A tie is never broken — everyone tied wins.** There's no runoff or re-vote.
+The wheel spins as normal, then cracks apart and breaks away, and every tied
+name is revealed together as a Star Player of the Week — two, three, six,
+however many (see `Wheel.tsx` and `joinNames` in `src/lib/winners.ts`).
+
+**Reset Voting, any time.** A revealer doesn't need to reveal anything to
+start a round over — the **Reset Voting** button clears every vote cast so
+far this round and locks voting again, with its own confirm step since it's
+destructive. A fresh Start Voting tap is needed afterward, same as any other
+locked start. Same underlying action ("Start a new vote") already existed
+for after a reveal, on the results page; this is the same escape hatch made
+available mid-session too — see `startNewRound` in
+`src/services/voting.service.ts`.
 
 ## Who voted for whom is never recorded
 
@@ -83,9 +161,9 @@ anyone reading the raw database could join to get from a vote back to a voter �
 the mapping was never stored, not merely hidden. This is the one guarantee in
 this app that has nothing to do with identity, so dropping sign-in entirely
 didn't weaken it at all: the counts are unreadable by anyone while voting is
-open (not just by KG — the rule doesn't check who's asking, only whether
-voting is closed), because watching a live count move is itself a way to
-infer who just voted for whom, no matter who's watching.
+open (not just by a revealer — the rule doesn't check who's asking, only
+whether voting is closed), because watching a live count move is itself a
+way to infer who just voted for whom, no matter who's watching.
 
 `sotw_voters` also clamps its own shape (`keys().hasOnly(['weekKey', 'ts'])`),
 so this isn't just a convention the app's own client happens to follow — a
